@@ -1,6 +1,6 @@
 {
   "hotkey": "f9",
-  "whisper_model": "base",
+  "whisper_model": "small.en",
   "ollama_model": "llama3.2:3b",
   "ollama_host": "localhost",
   "ollama_port": 11434,

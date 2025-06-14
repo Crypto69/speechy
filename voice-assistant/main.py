@@ -21,12 +21,26 @@ from transcriber import WhisperTranscriber
 from llm_client import OllamaClient
 from gui import VoiceAssistantGUI
 
-# Configure logging
+# Configure logging with proper path handling for bundled app
+def get_logs_dir():
+    """Get the logs directory, creating it if it doesn't exist."""
+    if getattr(sys, 'frozen', False):
+        # Running as bundled app
+        app_dir = os.path.dirname(sys.executable)
+        logs_dir = os.path.join(app_dir, 'logs')
+    else:
+        # Running as script
+        logs_dir = os.path.join(os.path.dirname(__file__), 'logs')
+    
+    os.makedirs(logs_dir, exist_ok=True)
+    return logs_dir
+
+logs_dir = get_logs_dir()
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('logs/voice_assistant.log'),
+        logging.FileHandler(os.path.join(logs_dir, 'voice_assistant.log')),
         logging.StreamHandler()
     ]
 )
@@ -125,6 +139,7 @@ class VoiceAssistant(QObject):
     status_message_signal = pyqtSignal(str)
     transcribing_state_signal = pyqtSignal(bool)
     generating_state_signal = pyqtSignal(bool)
+    model_loading_state_signal = pyqtSignal(bool)
     transcription_signal = pyqtSignal(str)
     response_signal = pyqtSignal(str)
     audio_level_signal = pyqtSignal(float)
@@ -146,8 +161,7 @@ class VoiceAssistant(QObject):
         self.recording = False
         self.current_audio_file: Optional[str] = None
         
-        # Setup logging directory
-        os.makedirs('logs', exist_ok=True)
+        # Setup logging directory (already handled by get_logs_dir function)
         
         # Initialize components
         self.init_components()
@@ -198,6 +212,7 @@ class VoiceAssistant(QObject):
             self.status_message_signal.connect(self.gui.statusBar().showMessage)
             self.transcribing_state_signal.connect(self.gui.set_transcribing_state)
             self.generating_state_signal.connect(self.gui.set_generating_state)
+            self.model_loading_state_signal.connect(self.gui.set_model_loading_state)
             self.transcription_signal.connect(self.gui.set_transcription)
             self.response_signal.connect(self.gui.set_response)
             self.audio_level_signal.connect(self.gui.set_audio_level)
@@ -215,6 +230,10 @@ class VoiceAssistant(QObject):
         """Load models asynchronously."""
         def load_worker():
             try:
+                # Signal model loading has started
+                if self.gui:
+                    self.model_loading_state_signal.emit(True)
+                
                 # Load Whisper model
                 if self.gui:
                     self.status_message_signal.emit("Loading Whisper model...")
@@ -223,6 +242,7 @@ class VoiceAssistant(QObject):
                     logger.error("Failed to load Whisper model")
                     if self.gui:
                         self.status_message_signal.emit("Failed to load Whisper model")
+                        self.model_loading_state_signal.emit(False)
                     return
                 
                 # Check Ollama connection
@@ -236,7 +256,9 @@ class VoiceAssistant(QObject):
                 else:
                     logger.info("Ollama server connection verified")
                 
+                # Signal model loading has completed
                 if self.gui:
+                    self.model_loading_state_signal.emit(False)
                     self.status_message_signal.emit("Ready")
                 
                 logger.info("Models loaded successfully")
@@ -245,6 +267,7 @@ class VoiceAssistant(QObject):
                 logger.error(f"Error loading models: {e}")
                 if self.gui:
                     self.status_message_signal.emit(f"Error loading models: {e}")
+                    self.model_loading_state_signal.emit(False)
         
         thread = threading.Thread(target=load_worker, daemon=True)
         thread.start()
@@ -372,20 +395,26 @@ class VoiceAssistant(QObject):
 1. Fix any obvious speech-to-text errors (like "cold started" instead of "called started")
 2. Remove filler words (um, uh, you know, like, etc.)
 3. Clean up grammar and make the text more readable
-4. Preserve the original intent and meaning
+4. Understand and preserve the original intent and meaning
 5. Return ONLY the corrected text, nothing else
+6. Your output should be a clean, corrected version of the input text without any additional commentary or explanations.
+7. Add punctuation where are use specifies it, but do not add any additional punctuation. For example:
+- if the user says "Full stop" or "period" then you should add a full stop at that point.
+- if the user says "comma" then you should add a comma at that point.
+- if the user says "question mark" then you should add a question mark at that point.
 
 Examples:
 - "I called started the server" → "I cold started the server"
 - "I would like to um, start you know the server" → "I would like to start the server"
 - "Can you uh, help me with this thing" → "Can you help me with this"
+- "I think we should comma like, go now full stop" → "I think we should, go now."
 
 Fix this transcription:"""
                     
                     response = self.llm_client.generate_response(
                         prompt, 
                         system_prompt=system_prompt,
-                        temperature=0.3  # Lower temperature for more consistent corrections
+                        temperature=0.2  # Lower temperature for more consistent corrections
                     )
                 
                 if self.gui:

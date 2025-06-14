@@ -1,0 +1,15 @@
+{
+    "hotkey": "f9",
+    "whisper_model": "small.en",
+    "ollama_model": "llama3:latest",
+    "ollama_host": "localhost",
+    "ollama_port": 11434,
+    "audio_device_index": null,
+    "audio_sample_rate": 16000,
+    "audio_chunk_size": 1024,
+    "log_transcriptions": true,
+    "log_file": "logs/transcriptions.log",
+    "notification_enabled": true,
+    "copy_to_clipboard": true,
+    "gui_theme": "dark"
+}

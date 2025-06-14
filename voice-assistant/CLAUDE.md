@@ -52,7 +52,7 @@ for i in range(p.get_device_count()):
 **Build Executable:**
 ```bash
 pip install pyinstaller
-pyinstaller --onefile --windowed main.py
+pyinstaller --onefile --windowed --icon="icon.png" main.py
 ```
 
 ## Architecture Overview

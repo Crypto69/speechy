@@ -108,6 +108,7 @@ class VoiceAssistantGUI(QMainWindow):
         self.recording = False
         self.transcribing = False
         self.generating = False
+        self.model_loading = False
         
         # Callbacks
         self.toggle_recording_callback: Optional[Callable] = None
@@ -120,6 +121,11 @@ class VoiceAssistantGUI(QMainWindow):
         """Initialize the user interface."""
         self.setWindowTitle("Voice Assistant")
         self.setGeometry(100, 100, 800, 600)
+        
+        # Set application icon (not system tray icon)
+        icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
         
         # Create central widget and layout
         central_widget = QWidget()
@@ -249,6 +255,7 @@ class VoiceAssistantGUI(QMainWindow):
         hotkey_layout.addWidget(QLabel("Hotkey:"))
         self.hotkey_combo = QComboBox()
         self.hotkey_combo.addItems(['f9', 'f10', 'f11', 'f12', 'ctrl+space', 'alt+space'])
+        self.hotkey_combo.setMinimumWidth(150)
         self.hotkey_combo.setCurrentText(self.config.get_hotkey())
         hotkey_layout.addWidget(self.hotkey_combo)
         hotkey_layout.addStretch()
@@ -266,7 +273,8 @@ class VoiceAssistantGUI(QMainWindow):
         whisper_layout = QHBoxLayout()
         whisper_layout.addWidget(QLabel("Whisper Model:"))
         self.whisper_combo = QComboBox()
-        self.whisper_combo.addItems(['tiny', 'base', 'small', 'medium', 'large'])
+        self.whisper_combo.addItems(['tiny', 'tiny.en', 'base', 'base.en', 'small', 'small.en', 'medium', 'medium.en', 'large'])
+        self.whisper_combo.setMinimumWidth(200)
         self.whisper_combo.setCurrentText(self.config.get_whisper_model())
         whisper_layout.addWidget(self.whisper_combo)
         whisper_layout.addStretch()
@@ -277,7 +285,8 @@ class VoiceAssistantGUI(QMainWindow):
         ollama_layout.addWidget(QLabel("Ollama Model:"))
         self.ollama_combo = QComboBox()
         self.ollama_combo.setEditable(True)
-        self.ollama_combo.addItems(['llama3.2:3b', 'llama3.2:1b', 'llama3.1:8b', 'mistral', 'codellama'])
+        self.ollama_combo.addItems(['llama3.2:3b', 'llama3.2:1b', 'llama3.1:8b', 'llama3:latest', 'mistral', 'codellama'])
+        self.ollama_combo.setMinimumWidth(200)
         self.ollama_combo.setCurrentText(self.config.get_ollama_model())
         ollama_layout.addWidget(self.ollama_combo)
         ollama_layout.addStretch()
@@ -429,6 +438,11 @@ class VoiceAssistantGUI(QMainWindow):
     
     def toggle_recording(self):
         """Toggle manual recording."""
+        # Don't allow recording if models are still loading
+        if self.model_loading:
+            self.statusBar().showMessage("Please wait for models to finish loading...", 3000)
+            return
+            
         if self.toggle_recording_callback:
             self.toggle_recording_callback()
     
@@ -469,7 +483,7 @@ class VoiceAssistantGUI(QMainWindow):
             self.statusBar().showMessage("Transcribing audio...")
         else:
             self.progress_bar.setVisible(False)
-            if not self.generating:
+            if not self.generating and not self.model_loading:
                 self.status_label.setText("Ready")
                 self.statusBar().showMessage("Ready")
     
@@ -484,7 +498,29 @@ class VoiceAssistantGUI(QMainWindow):
             self.statusBar().showMessage("Generating AI response...")
         else:
             self.progress_bar.setVisible(False)
-            if not self.transcribing:
+            if not self.transcribing and not self.model_loading:
+                self.status_label.setText("Ready")
+                self.statusBar().showMessage("Ready")
+    
+    def set_model_loading_state(self, loading: bool):
+        """Update model loading state in GUI."""
+        self.model_loading = loading
+        
+        # Disable/enable recording button based on model loading state
+        self.record_button.setEnabled(not loading)
+        
+        # Also disable tray menu recording actions
+        if hasattr(self, 'start_recording_action'):
+            self.start_recording_action.setEnabled(not loading)
+        if hasattr(self, 'stop_recording_action'):
+            self.stop_recording_action.setEnabled(not loading)
+        
+        if loading:
+            self.progress_bar.setVisible(True)
+            self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        else:
+            self.progress_bar.setVisible(False)
+            if not self.transcribing and not self.generating:
                 self.status_label.setText("Ready")
                 self.statusBar().showMessage("Ready")
     

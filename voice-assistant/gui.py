@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout
                             QSystemTrayIcon, QMenu, QAction, QMessageBox, QFrame,
                             QComboBox, QCheckBox, QSpinBox, QGroupBox, QTabWidget,
                             QSplitter)
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, pyqtSlot
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, pyqtSlot, QObject
 from PyQt5.QtGui import QIcon, QFont, QPalette, QColor, QPixmap, QPainter
 
 logger = logging.getLogger(__name__)
@@ -17,16 +17,27 @@ logger = logging.getLogger(__name__)
 class RecordingIndicator(QWidget):
     """Custom widget to show recording status with animated indicator."""
     
+    # Signals for thread-safe operations
+    recording_changed = pyqtSignal(bool)
+    
     def __init__(self):
         super().__init__()
         self.recording = False
         self.audio_level = 0.0
-        self.timer = QTimer()
+        self.timer = QTimer(self)  # Set parent to ensure proper cleanup
         self.timer.timeout.connect(self.update)
         self.blink_state = False
         
+        # Connect signal to slot for thread-safe timer operations
+        self.recording_changed.connect(self._on_recording_changed)
+        
     def set_recording(self, recording: bool):
-        """Set recording state."""
+        """Set recording state (thread-safe)."""
+        self.recording_changed.emit(recording)
+    
+    @pyqtSlot(bool)
+    def _on_recording_changed(self, recording: bool):
+        """Handle recording state change on main thread."""
         self.recording = recording
         if recording:
             self.timer.start(100)  # Update every 100ms
@@ -98,6 +109,8 @@ class VoiceAssistantGUI(QMainWindow):
     # Signals
     transcription_requested = pyqtSignal(str)  # Audio file path
     settings_changed = pyqtSignal(dict)  # New settings
+    models_updated = pyqtSignal(list)  # List of model names
+    models_loading = pyqtSignal(bool)  # Loading state
     
     def __init__(self, config, hotkey_manager=None):
         super().__init__()
@@ -116,6 +129,10 @@ class VoiceAssistantGUI(QMainWindow):
         self.init_ui()
         self.init_system_tray()
         self.apply_theme()
+        
+        # Connect signals for thread-safe model updates
+        self.models_updated.connect(self._on_models_updated)
+        self.models_loading.connect(self._on_models_loading)
         
     def init_ui(self):
         """Initialize the user interface."""
@@ -293,12 +310,21 @@ class VoiceAssistantGUI(QMainWindow):
         ollama_layout.addWidget(QLabel("Ollama Model:"))
         self.ollama_combo = QComboBox()
         self.ollama_combo.setEditable(True)
-        self.ollama_combo.addItems(['llama3.2:3b', 'llama3.2:1b', 'llama3.1:8b', 'llama3:latest', 'mistral', 'codellama'])
         self.ollama_combo.setMinimumWidth(200)
-        self.ollama_combo.setCurrentText(self.config.get_ollama_model())
         ollama_layout.addWidget(self.ollama_combo)
+        
+        # Add refresh button for models
+        self.refresh_models_btn = QPushButton("🔄")
+        self.refresh_models_btn.setMaximumWidth(30)
+        self.refresh_models_btn.setToolTip("Refresh available models from Ollama")
+        self.refresh_models_btn.clicked.connect(self.refresh_ollama_models)
+        ollama_layout.addWidget(self.refresh_models_btn)
+        
         ollama_layout.addStretch()
         model_layout.addLayout(ollama_layout)
+        
+        # Initialize models list (will be populated after GUI is ready)
+        self._populate_ollama_models_async()
         
         layout.addWidget(model_group)
         
@@ -822,3 +848,113 @@ class VoiceAssistantGUI(QMainWindow):
             
         except Exception as e:
             self.statusBar().showMessage(f"Auto-typing test failed: {e}", 3000)
+    
+    def _populate_ollama_models_async(self):
+        """Populate Ollama models list asynchronously."""
+        import threading
+        
+        def fetch_models():
+            try:
+                self.models_loading.emit(True)
+                
+                # Try to get models from Ollama server
+                from llm_client import OllamaClient
+                ollama_client = OllamaClient(
+                    base_url=self.config.get_ollama_url(),
+                    model=self.config.get_ollama_model()
+                )
+                
+                models = ollama_client.list_models()
+                
+                if models:
+                    # Extract model names from the response
+                    model_names = []
+                    for model in models:
+                        if 'name' in model:
+                            model_names.append(model['name'])
+                    
+                    # Emit signal to update GUI on main thread
+                    self.models_updated.emit(model_names)
+                else:
+                    # Emit empty list to trigger fallback
+                    self.models_updated.emit([])
+                    
+            except Exception as e:
+                logger.error(f"Error fetching Ollama models: {e}")
+                # Emit empty list to trigger fallback
+                self.models_updated.emit([])
+            finally:
+                self.models_loading.emit(False)
+        
+        thread = threading.Thread(target=fetch_models, daemon=True)
+        thread.start()
+    
+    @pyqtSlot(list)
+    def _on_models_updated(self, model_names):
+        """Handle models updated signal (thread-safe)."""
+        try:
+            # Store current selection
+            current_model = self.config.get_ollama_model()
+            
+            # Clear and populate with new models
+            self.ollama_combo.clear()
+            
+            if model_names:
+                # Sort models for better UX
+                sorted_models = sorted(model_names)
+                self.ollama_combo.addItems(sorted_models)
+                
+                # Set current model if it exists in the list
+                if current_model in sorted_models:
+                    self.ollama_combo.setCurrentText(current_model)
+                else:
+                    # Add current model as custom entry if not in list
+                    self.ollama_combo.addItem(current_model)
+                    self.ollama_combo.setCurrentText(current_model)
+                
+                self.statusBar().showMessage(f"Found {len(model_names)} Ollama models", 2000)
+            else:
+                # Use fallback models if no models found
+                self._use_fallback_models()
+                
+        except Exception as e:
+            logger.error(f"Error updating models list: {e}")
+            self._use_fallback_models()
+    
+    @pyqtSlot(bool)
+    def _on_models_loading(self, loading):
+        """Handle models loading signal (thread-safe)."""
+        try:
+            if loading:
+                self.refresh_models_btn.setText("⏳")
+                self.refresh_models_btn.setEnabled(False)
+            else:
+                self.refresh_models_btn.setText("🔄")
+                self.refresh_models_btn.setEnabled(True)
+        except Exception as e:
+            logger.error(f"Error setting loading state: {e}")
+    
+    def _use_fallback_models(self):
+        """Use fallback hardcoded models list."""
+        try:
+            current_model = self.config.get_ollama_model()
+            
+            # Hardcoded fallback list
+            fallback_models = [
+                'llama3.2:3b', 'llama3.2:1b', 'llama3.1:8b', 
+                'llama3:latest', 'mistral', 'codellama'
+            ]
+            
+            self.ollama_combo.clear()
+            self.ollama_combo.addItems(fallback_models)
+            self.ollama_combo.setCurrentText(current_model)
+            
+            self.statusBar().showMessage("Using default models (Ollama server unavailable)", 3000)
+            
+        except Exception as e:
+            logger.error(f"Error setting fallback models: {e}")
+    
+    def refresh_ollama_models(self):
+        """Refresh the Ollama models list."""
+        self._populate_ollama_models_async()
+        self.statusBar().showMessage("Refreshing Ollama models...", 1000)

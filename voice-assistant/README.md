@@ -222,6 +222,7 @@ python main.py
 
 - **Main Tab**: Shows recording status, transcription, and AI response with copy/clear buttons
 - **Settings Tab**: Configure hotkeys, models, auto-typing, and all features
+- **Dynamic Model Selection**: Automatically detects installed Ollama models with refresh button
 - **System Tray**: Right-click for quick access to show/hide/quit/record
 - **Recording Indicator**: Animated visual feedback with real-time audio level meter
 - **Manual Recording**: Use the "Toggle Recording" button as alternative to hotkey

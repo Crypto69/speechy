@@ -1,4 +1,4 @@
-"""Main application entry point for the voice assistant."""
+"""Main application entry point for Speechy - Your AI Voice Assistant."""
 
 import sys
 import os
@@ -20,6 +20,7 @@ from audio_handler import AudioHandler
 from transcriber import WhisperTranscriber
 from llm_client import OllamaClient
 from gui import VoiceAssistantGUI
+from auto_typer import AutoTyper
 
 # Configure logging with proper path handling for bundled app
 def get_logs_dir():
@@ -155,6 +156,7 @@ class VoiceAssistant(QObject):
         self.llm_client: Optional[OllamaClient] = None
         self.hotkey_manager: Optional[HotkeyManager] = None
         self.gui: Optional[VoiceAssistantGUI] = None
+        self.auto_typer: Optional[AutoTyper] = None
         
         # State variables
         self.recording = False
@@ -195,6 +197,15 @@ class VoiceAssistant(QObject):
             self.hotkey_manager = HotkeyManager(self.config.get_hotkey())
             self.hotkey_manager.hotkey_toggled.connect(self.toggle_recording)
             
+            # Initialize auto-typer
+            self.auto_typer = AutoTyper()
+            self.auto_typer.set_enabled(self.config.is_auto_typing_enabled())
+            self.auto_typer.set_typing_delay(self.config.get_auto_typing_delay())
+            self.auto_typer.set_typing_speed(self.config.get_auto_typing_speed())
+            for app in self.config.get_auto_typing_excluded_apps():
+                self.auto_typer.add_excluded_app(app)
+            logger.info("Auto-typer initialized")
+            
             logger.info("Voice assistant components initialized successfully")
             
         except Exception as e:
@@ -216,6 +227,14 @@ class VoiceAssistant(QObject):
             self.transcription_signal.connect(self.gui.set_transcription)
             self.response_signal.connect(self.gui.set_response)
             self.audio_level_signal.connect(self.gui.set_audio_level)
+            
+            # Ensure auto-typer settings are synchronized with current config
+            if self.auto_typer:
+                self.auto_typer.set_enabled(self.config.is_auto_typing_enabled())
+                logger.info(f"Auto-typer enabled status set to: {self.config.is_auto_typing_enabled()}")
+            
+            # Set reference to voice assistant in GUI for auto-typer testing
+            self.gui._voice_assistant = self
             
             # Load Whisper model in background
             self.load_models_async()
@@ -329,19 +348,6 @@ class VoiceAssistant(QObject):
                 if self.current_audio_file:
                     logger.info(f"Recording stopped, saved to: {self.current_audio_file}")
                     
-                    # For debugging: save a copy of the audio file in bundled apps
-                    if getattr(sys, 'frozen', False):
-                        try:
-                            import shutil
-                            debug_dir = os.path.expanduser("~/.speechy/debug_audio")
-                            os.makedirs(debug_dir, exist_ok=True)
-                            timestamp = time.strftime("%Y%m%d_%H%M%S")
-                            debug_file = os.path.join(debug_dir, f"recording_{timestamp}.wav")
-                            shutil.copy2(self.current_audio_file, debug_file)
-                            logger.info(f"Debug: saved audio copy to {debug_file}")
-                        except Exception as e:
-                            logger.warning(f"Could not save debug audio copy: {e}")
-                    
                     # Process the audio asynchronously
                     self.process_audio_async(self.current_audio_file)
                 else:
@@ -382,6 +388,17 @@ class VoiceAssistant(QObject):
                     # Copy to clipboard if enabled
                     if self.config.should_copy_to_clipboard():
                         pyperclip.copy(transcription)
+                    
+                    # Auto-type transcription if enabled and mode is "raw" or "both"
+                    if (self.auto_typer and self.config.is_auto_typing_enabled() and 
+                        self.config.get_auto_typing_mode() in ["raw", "both"]):
+                        def typing_callback(success: bool, message: str):
+                            if success:
+                                logger.info("Auto-typing completed successfully")
+                            else:
+                                logger.warning(f"Auto-typing failed: {message}")
+                        
+                        self.auto_typer.type_text_async(transcription, typing_callback)
                     
                     # Generate LLM response
                     self.generate_llm_response_async(transcription)
@@ -453,6 +470,17 @@ Fix this transcription:"""
                     if self.gui:
                         self.response_signal.emit(response)
                     
+                    # Auto-type corrected response if enabled and mode is "corrected" 
+                    if (self.auto_typer and self.config.is_auto_typing_enabled() and 
+                        self.config.get_auto_typing_mode() == "corrected"):
+                        def typing_callback(success: bool, message: str):
+                            if success:
+                                logger.info("Auto-typing corrected text completed successfully")
+                            else:
+                                logger.warning(f"Auto-typing corrected text failed: {message}")
+                        
+                        self.auto_typer.type_text_async(response, typing_callback)
+                    
                     # Show notification if enabled
                     if self.config.is_notification_enabled():
                         self.show_notification("AI Response Ready", "Response generated successfully")
@@ -496,6 +524,17 @@ Fix this transcription:"""
                 # Update LLM client model
                 if self.llm_client:
                     self.llm_client.set_model(new_settings.get('ollama_model'))
+            
+            # Update auto-typer settings if they changed
+            if self.auto_typer:
+                if new_settings.get('auto_typing_enabled') != self.config.is_auto_typing_enabled():
+                    self.auto_typer.set_enabled(new_settings.get('auto_typing_enabled', False))
+                
+                if new_settings.get('auto_typing_delay') != self.config.get_auto_typing_delay():
+                    self.auto_typer.set_typing_delay(new_settings.get('auto_typing_delay', 1.0))
+                
+                if new_settings.get('auto_typing_speed') != self.config.get_auto_typing_speed():
+                    self.auto_typer.set_typing_speed(new_settings.get('auto_typing_speed', 0.02))
             
             logger.info("Settings updated successfully")
             
@@ -585,7 +624,7 @@ def main():
         app = QApplication(sys.argv)
         
         # Check if another instance is already running
-        app.setApplicationName("VoiceAssistant")
+        app.setApplicationName("Speechy")
         app.setApplicationVersion("1.0")
         
         # Prevent multiple instances using Qt's built-in mechanism
@@ -598,7 +637,7 @@ def main():
             sock.listen(1)
         except socket.error:
             logger.error("Another instance of Voice Assistant is already running")
-            QMessageBox.warning(None, "Voice Assistant", "Another instance is already running!")
+            QMessageBox.warning(None, "Speechy - Your AI Voice Assistant", "Another instance is already running!")
             sys.exit(1)
         
         app.setQuitOnLastWindowClosed(False)  # Keep running when window is closed
@@ -641,7 +680,7 @@ def main():
             
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Critical)
-            msg.setWindowTitle("Voice Assistant Error")
+            msg.setWindowTitle("Speechy - Your AI Voice Assistant Error")
             msg.setText(f"Fatal error occurred:\n\n{str(e)}")
             msg.exec_()
             

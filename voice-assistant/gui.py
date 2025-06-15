@@ -1,4 +1,4 @@
-"""GUI and system tray interface for the voice assistant."""
+"""GUI and system tray interface for Speechy - Your AI Voice Assistant."""
 
 import sys
 import os
@@ -119,7 +119,7 @@ class VoiceAssistantGUI(QMainWindow):
         
     def init_ui(self):
         """Initialize the user interface."""
-        self.setWindowTitle("Voice Assistant")
+        self.setWindowTitle("Speechy - Your AI Voice Assistant")
         self.setGeometry(100, 100, 800, 600)
         
         # Set application icon (not system tray icon)
@@ -175,6 +175,14 @@ class VoiceAssistantGUI(QMainWindow):
         self.record_button = QPushButton("Toggle Recording")
         self.record_button.clicked.connect(self.toggle_recording)
         status_layout.addWidget(self.record_button)
+        
+        # Auto-typing toggle button
+        self.auto_typing_button = QPushButton("Auto-Type: OFF")
+        self.auto_typing_button.setCheckable(True)
+        self.auto_typing_button.setChecked(self.config.is_auto_typing_enabled())
+        self.auto_typing_button.clicked.connect(self.toggle_auto_typing)
+        self.update_auto_typing_button()
+        status_layout.addWidget(self.auto_typing_button)
         
         layout.addWidget(status_group)
         
@@ -312,6 +320,46 @@ class VoiceAssistantGUI(QMainWindow):
         
         layout.addWidget(features_group)
         
+        # Auto-typing settings
+        auto_typing_group = QGroupBox("Auto-Typing")
+        auto_typing_layout = QVBoxLayout(auto_typing_group)
+        
+        self.auto_typing_enabled_cb = QCheckBox("Enable auto-typing at cursor position")
+        self.auto_typing_enabled_cb.setChecked(self.config.is_auto_typing_enabled())
+        auto_typing_layout.addWidget(self.auto_typing_enabled_cb)
+        
+        # Auto-typing mode
+        mode_layout = QHBoxLayout()
+        mode_layout.addWidget(QLabel("Auto-typing mode:"))
+        self.auto_typing_mode_combo = QComboBox()
+        self.auto_typing_mode_combo.addItems(['raw', 'corrected', 'both'])
+        self.auto_typing_mode_combo.setMinimumWidth(150)
+        self.auto_typing_mode_combo.setCurrentText(self.config.get_auto_typing_mode())
+        mode_layout.addWidget(self.auto_typing_mode_combo)
+        mode_layout.addStretch()
+        auto_typing_layout.addLayout(mode_layout)
+        
+        # Typing delay
+        delay_layout = QHBoxLayout()
+        delay_layout.addWidget(QLabel("Delay before typing (seconds):"))
+        self.auto_typing_delay_spin = QSpinBox()
+        self.auto_typing_delay_spin.setRange(0, 10)
+        self.auto_typing_delay_spin.setValue(int(self.config.get_auto_typing_delay()))
+        self.auto_typing_delay_spin.setMinimumWidth(100)
+        delay_layout.addWidget(self.auto_typing_delay_spin)
+        delay_layout.addStretch()
+        auto_typing_layout.addLayout(delay_layout)
+        
+        # Test button
+        test_layout = QHBoxLayout()
+        self.auto_typing_test_btn = QPushButton("Test Auto-Typing")
+        self.auto_typing_test_btn.clicked.connect(self.test_auto_typing)
+        test_layout.addWidget(self.auto_typing_test_btn)
+        test_layout.addStretch()
+        auto_typing_layout.addLayout(test_layout)
+        
+        layout.addWidget(auto_typing_group)
+        
         # Save settings button
         save_layout = QHBoxLayout()
         save_layout.addStretch()
@@ -333,17 +381,9 @@ class VoiceAssistantGUI(QMainWindow):
         # Create system tray icon
         self.tray_icon = QSystemTrayIcon(self)
         
-        # Create a simple icon (colored circle)
-        pixmap = QPixmap(16, 16)
-        pixmap.fill(Qt.transparent)
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setBrush(QColor(0, 120, 200))
-        painter.drawEllipse(1, 1, 14, 14)
-        painter.end()
-        
-        self.tray_icon.setIcon(QIcon(pixmap))
-        self.tray_icon.setToolTip("Voice Assistant")
+        # Set initial tray icon (blue for idle)
+        self.update_tray_icon(recording=False)
+        self.tray_icon.setToolTip("Speechy - Your AI Voice Assistant")
         
         # Create context menu
         tray_menu = QMenu()
@@ -383,6 +423,32 @@ class VoiceAssistantGUI(QMainWindow):
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.activated.connect(self.tray_icon_activated)
         self.tray_icon.show()
+    
+    def update_tray_icon(self, recording: bool):
+        """Update the system tray icon based on recording state.
+        
+        Args:
+            recording: True if recording, False if idle
+        """
+        pixmap = QPixmap(16, 16)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        if recording:
+            # Red circle for recording
+            painter.setBrush(QColor(255, 50, 50))
+            self.tray_icon.setToolTip("Speechy - Your AI Voice Assistant - Recording")
+        else:
+            # Blue circle for idle
+            painter.setBrush(QColor(0, 120, 200))
+            self.tray_icon.setToolTip("Speechy - Your AI Voice Assistant - Ready")
+        
+        painter.drawEllipse(1, 1, 14, 14)
+        painter.end()
+        
+        if hasattr(self, 'tray_icon'):
+            self.tray_icon.setIcon(QIcon(pixmap))
     
     def apply_theme(self):
         """Apply the selected theme."""
@@ -450,6 +516,9 @@ class VoiceAssistantGUI(QMainWindow):
         """Update recording state in GUI."""
         self.recording = recording
         self.recording_indicator.set_recording(recording)
+        
+        # Update tray icon to show recording state
+        self.update_tray_icon(recording)
         
         if recording:
             self.status_label.setText("Recording...")
@@ -568,9 +637,53 @@ class VoiceAssistantGUI(QMainWindow):
         self.hotkey_label.setText(f"Hotkey: {self.config.get_hotkey().upper()} (Press once to start/stop)")
         
         # Emit settings changed signal
+        # Update auto-typing settings
+        self.config.set("auto_typing_enabled", self.auto_typing_enabled_cb.isChecked())
+        self.config.set("auto_typing_mode", self.auto_typing_mode_combo.currentText())
+        self.config.set("auto_typing_delay", float(self.auto_typing_delay_spin.value()))
+        
+        # Update auto-typing button to reflect current state
+        self.auto_typing_button.setChecked(self.auto_typing_enabled_cb.isChecked())
+        self.update_auto_typing_button()
+        
+        # Emit settings changed signal
         self.settings_changed.emit(self.config.config)
         
         self.statusBar().showMessage("Settings saved", 2000)
+    
+    def toggle_auto_typing(self):
+        """Toggle auto-typing on/off."""
+        enabled = self.auto_typing_button.isChecked()
+        self.config.set("auto_typing_enabled", enabled)
+        self.update_auto_typing_button()
+        
+        # Also update the settings checkbox
+        self.auto_typing_enabled_cb.setChecked(enabled)
+        
+        # Emit settings changed signal
+        self.settings_changed.emit(self.config.config)
+        
+        self.statusBar().showMessage(f"Auto-typing {'enabled' if enabled else 'disabled'}", 2000)
+    
+    def update_auto_typing_button(self):
+        """Update the auto-typing button appearance."""
+        enabled = self.auto_typing_button.isChecked()
+        self.auto_typing_button.setText(f"Auto-Type: {'ON' if enabled else 'OFF'}")
+        
+        # Update button styling
+        if enabled:
+            self.auto_typing_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #45a049;
+                }
+            """)
+        else:
+            self.auto_typing_button.setStyleSheet("")
     
     def show_window(self):
         """Show the main window."""
@@ -598,37 +711,114 @@ class VoiceAssistantGUI(QMainWindow):
     
     def show_about(self):
         """Show about dialog."""
-        about_text = """
-        <h3>Voice Assistant</h3>
-        <p>A voice-to-text application using OpenAI Whisper and Ollama.</p>
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTextBrowser, QPushButton, QLabel
+        from PyQt5.QtCore import Qt
         
-        <p><b>Features:</b></p>
-        <ul>
+        # Create custom dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("About Speechy - Your AI Voice Assistant")
+        dialog.setFixedSize(700, 700)  # Increased height to show all content without scrolling
+        
+        # Create layout
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Get the absolute path to the Instagram icon
+        icon_path = os.path.join(os.path.dirname(__file__), "instagram-icon.png")
+        
+        # Create content with HTML
+        about_text = f"""
+        <h2 style="color: #7fae7e; margin-bottom: 10px;">Speechy - Your AI Voice Assistant</h2>
+        <p style="font-size: 14px; margin-bottom: 20px;">A voice-to-text application that uses AI to understand your intent. It automatically fixes bad grammar.</p>
+        
+        <h3 style="color: #7fae7e;">Features:</h3>
+        <ul style="line-height: 1.6;">
         <li>Real-time audio recording</li>
-        <li>Local speech-to-text with Whisper</li>
-        <li>AI response generation with Ollama</li>
-        <li>Hotkey support (F9)</li>
-        <li>System tray integration</li>
+        <li>Local speech-to-text</li>
+        <li>AI auto correction of your grammar. Remove filler words like um or you know.</li>
+        <li>Hotkey support - start and stop recording with predefined hotkeys</li>
+        <li>System tray integration allowing you to start and stop recording</li>
+        <li>Visual display of active recording</li>
+        <li>Auto-typing of transcriptions at cursor position</li>
+        <li>Configurable settings for models, hotkeys, and features</li>
+        <li>Notifications for recording and transcription status</li>
+        <li>Transcription logging to file</li>
         </ul>
         
-        <p><b>Usage:</b></p>
-        <ul>
-        <li>Press F9 or use GUI button to start/stop recording</li>
+        <h3 style="color: #7fae7e;">Usage:</h3>
+        <ul style="line-height: 1.6;">
+        <li>Press hot key (default = F9) or use GUI button to start/stop recording</li>
         <li>Right-click system tray for quick access</li>
         <li>Configure settings in the Settings tab</li>
+        <li>Transcriptions and AI responses will appear in the Results section</li>
+        <li>Use the "Copy" buttons to copy text to clipboard. Toggle if text automatically copied to clipboard</li>
+        <li>Auto-typing can be enabled to type transcriptions directly at the cursor position</li>
+        <li>Choose if you would like the raw input of the corrected input to be used</li>
+        <li>Clear results with the "Clear" button</li>
+        <li>Save settings to persist changes</li>
         </ul>
         
-        <p>Add your custom text here...</p>
+        <hr style="margin: 20px 0; border: 1px solid #bdc3c7;">
+        
+        <p style="margin-bottom: 10px;"><b>Designed and built by Chris Venter.</b></p>
+        <p><img src="file://{icon_path}" width="16" height="16" style="vertical-align: middle;"> <a href="https://www.instagram.com/myaccessibility/" style="color: #3498db; text-decoration: none;">https://www.instagram.com/myaccessibility/</a></p>
         """
         
-        msg = QMessageBox(self)
-        msg.setWindowTitle("About Voice Assistant")
-        msg.setText(about_text)
-        msg.setIcon(QMessageBox.Information)
-        msg.setStandardButtons(QMessageBox.Ok)
-        msg.exec_()
+        # Create text widget for the content
+        from PyQt5.QtGui import QDesktopServices
+        from PyQt5.QtCore import QUrl
+        
+        text_widget = QTextBrowser()  # Use QTextBrowser instead of QTextEdit
+        text_widget.setHtml(about_text)
+        text_widget.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        text_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        text_widget.setFrameStyle(0)  # Remove border
+        text_widget.setOpenExternalLinks(True)  # This works with QTextBrowser
+        
+        layout.addWidget(text_widget)
+        
+        # Create OK button
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        ok_button = QPushButton("OK")
+        ok_button.setMinimumWidth(80)
+        ok_button.clicked.connect(dialog.accept)
+        button_layout.addWidget(ok_button)
+        
+        layout.addLayout(button_layout)
+        
+        # Show dialog
+        dialog.exec_()
     
     def show_notification(self, title: str, message: str):
         """Show system notification."""
         if self.tray_icon and self.tray_icon.isVisible():
             self.tray_icon.showMessage(title, message, QSystemTrayIcon.Information, 3000)
+    
+    def test_auto_typing(self):
+        """Test auto-typing functionality."""
+        try:
+            # Access the parent voice assistant to get the auto_typer
+            parent_widget = self.parent()
+            while parent_widget:
+                if hasattr(parent_widget, 'auto_typer'):
+                    if parent_widget.auto_typer:
+                        parent_widget.auto_typer.test_typing()
+                        self.statusBar().showMessage("Auto-typing test initiated - watch for test text", 3000)
+                        return
+                    break
+                parent_widget = parent_widget.parent() if hasattr(parent_widget, 'parent') else None
+            
+            # If we can't find the auto_typer via parent, try global variable (should be set in main)
+            if hasattr(self, '_voice_assistant') and self._voice_assistant:
+                if self._voice_assistant.auto_typer:
+                    self._voice_assistant.auto_typer.test_typing()
+                    self.statusBar().showMessage("Auto-typing test initiated - watch for test text", 3000)
+                    return
+            
+            self.statusBar().showMessage("Auto-typer not accessible - check initialization", 3000)
+            
+        except Exception as e:
+            self.statusBar().showMessage(f"Auto-typing test failed: {e}", 3000)

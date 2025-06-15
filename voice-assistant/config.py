@@ -23,7 +23,12 @@ class Config:
         "log_file": "logs/transcriptions.log",
         "notification_enabled": True,
         "copy_to_clipboard": True,
-        "gui_theme": "dark"
+        "gui_theme": "dark",
+        "auto_typing_enabled": False,
+        "auto_typing_delay": 1.0,
+        "auto_typing_speed": 0.02,
+        "auto_typing_mode": "raw",  # "raw", "corrected", or "both"
+        "auto_typing_excluded_apps": ["Keychain Access", "Login Window", "1Password"]
     }
     
     def __init__(self, config_file: str = "config.json"):
@@ -146,3 +151,23 @@ class Config:
     def get_gui_theme(self) -> str:
         """Get GUI theme."""
         return self.config.get("gui_theme", "dark")
+    
+    def is_auto_typing_enabled(self) -> bool:
+        """Check if auto-typing is enabled."""
+        return self.config.get("auto_typing_enabled", False)
+    
+    def get_auto_typing_delay(self) -> float:
+        """Get auto-typing delay."""
+        return self.config.get("auto_typing_delay", 1.0)
+    
+    def get_auto_typing_speed(self) -> float:
+        """Get auto-typing speed."""
+        return self.config.get("auto_typing_speed", 0.02)
+    
+    def get_auto_typing_mode(self) -> str:
+        """Get auto-typing mode."""
+        return self.config.get("auto_typing_mode", "raw")
+    
+    def get_auto_typing_excluded_apps(self) -> list:
+        """Get list of excluded applications for auto-typing."""
+        return self.config.get("auto_typing_excluded_apps", ["Keychain Access", "Login Window", "1Password"])

@@ -11,5 +11,14 @@
     "log_file": "logs/transcriptions.log",
     "notification_enabled": true,
     "copy_to_clipboard": true,
-    "gui_theme": "dark"
+    "gui_theme": "dark",
+    "auto_typing_enabled": true,
+    "auto_typing_delay": 2.0,
+    "auto_typing_speed": 0.02,
+    "auto_typing_mode": "corrected",
+    "auto_typing_excluded_apps": [
+        "Keychain Access",
+        "Login Window",
+        "1Password"
+    ]
 }

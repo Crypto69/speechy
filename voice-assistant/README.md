@@ -1,34 +1,52 @@
-# Voice Assistant
+# Speechy - Your AI Voice Assistant
 
-A Python application that provides voice-to-text transcription using OpenAI Whisper and AI responses through Ollama. The application features hotkey activation, real-time audio recording, local speech transcription, and intelligent responses from local LLM models.
+A comprehensive Python application that provides voice-to-text transcription using OpenAI Whisper and AI responses through Ollama. The application features hotkey activation, real-time audio recording, local speech transcription, intelligent grammar correction, and automatic typing at your cursor position.
 
 ## Features
 
+### Core Functionality
 - **Hotkey Activation**: Configurable global hotkey (default F9) for hands-free operation
-- **Real-time Audio Recording**: Low-latency microphone capture with visual feedback
-- **Local Speech-to-Text**: Uses OpenAI Whisper models running locally for privacy
-- **AI Integration**: Connects to Ollama for intelligent responses to transcribed speech
-- **System Tray Interface**: Minimalist GUI with system tray support
-- **Cross-platform**: Works on Windows, Mac, and Linux
-- **Configurable Settings**: JSON-based configuration for all settings
-- **Audio Level Monitoring**: Visual feedback during recording
-- **Transcription Logging**: Optional logging of all transcriptions
+- **Real-time Audio Recording**: Low-latency microphone capture with visual audio level feedback
+- **Local Speech-to-Text**: Uses OpenAI Whisper models running locally for complete privacy
+- **AI Grammar Correction**: Connects to Ollama for intelligent grammar correction and filler word removal
+- **Auto-Typing**: Types transcriptions directly at cursor position with configurable modes and delays
+
+### Interface & User Experience
+- **Professional GUI**: Modern PyQt5 interface with dark theme support
+- **System Tray Integration**: Minimalist system tray with right-click menu access
+- **Visual Recording Indicator**: Animated recording status with audio level meter
+- **Custom About Dialog**: Professional about dialog with clickable links and developer info
+- **Tabbed Settings**: Comprehensive settings panel with real-time configuration
+
+### Advanced Features
+- **Multiple Auto-Type Modes**: Choose between raw transcription, corrected text, or both
+- **Application Exclusions**: Prevent auto-typing in specified applications
+- **Configurable Delays**: Customizable typing speed and delay before typing
+- **Audio Level Monitoring**: Real-time visual feedback during recording
+- **Transcription Logging**: Optional logging of all transcriptions to file
 - **Clipboard Integration**: Auto-copy transcriptions to clipboard
-- **Notifications**: System notifications for transcription completion
+- **System Notifications**: Desktop notifications for transcription completion
+- **Cross-platform Support**: Works on Windows, macOS, and Linux
 
 ## Project Structure
 
 ```
 voice-assistant/
-├── main.py              # Main application entry point
-├── audio_handler.py     # Audio recording and processing
+├── main.py              # Main application entry point and coordination
+├── audio_handler.py     # Audio recording and processing with level monitoring
 ├── transcriber.py       # Whisper speech-to-text integration
-├── llm_client.py        # Ollama API client
-├── gui.py              # PyQt5 GUI and system tray
-├── config.py           # Configuration management
+├── llm_client.py        # Ollama API client with error handling
+├── gui.py              # PyQt5 GUI, system tray, and custom about dialog
+├── config.py           # Configuration management with validation
+├── auto_typer.py       # Auto-typing functionality with app exclusions
 ├── requirements.txt    # Python dependencies
-├── config.json         # User configuration file
+├── config.json         # User configuration file (auto-generated)
+├── icon.icns           # Application icon for macOS
+├── icon.png            # Application icon for other platforms
+├── instagram-icon.png  # Instagram icon for about dialog
 ├── logs/               # Log files directory
+├── dist/               # Built application (after PyInstaller)
+├── CLAUDE.md          # Development guidance for Claude Code
 └── README.md          # This file
 ```
 
@@ -111,15 +129,20 @@ The application uses `config.json` for settings. Default configuration is create
 
 ```json
 {
-    "hotkey": "f9",                    // Global hotkey for recording
-    "whisper_model": "base",           // Whisper model size
-    "ollama_model": "llama3.2:3b",     // Ollama model name
-    "ollama_host": "localhost",        // Ollama server host
-    "ollama_port": 11434,              // Ollama server port
-    "audio_sample_rate": 16000,        // Audio sample rate
-    "log_transcriptions": true,        // Log transcriptions to file
-    "notification_enabled": true,      // System notifications
-    "copy_to_clipboard": true          // Auto-copy to clipboard
+    "hotkey": "f9",                     // Global hotkey for recording
+    "whisper_model": "base",            // Whisper model size
+    "ollama_model": "llama3.2:3b",      // Ollama model name
+    "ollama_host": "localhost",         // Ollama server host
+    "ollama_port": 11434,               // Ollama server port
+    "audio_sample_rate": 16000,         // Audio sample rate
+    "log_transcriptions": true,         // Log transcriptions to file
+    "notification_enabled": true,       // System notifications
+    "copy_to_clipboard": true,          // Auto-copy to clipboard
+    "auto_typing_enabled": false,       // Enable auto-typing feature
+    "auto_typing_mode": "corrected",    // Mode: "raw", "corrected", or "both"
+    "auto_typing_delay": 1.0,          // Delay before typing (seconds)
+    "auto_typing_speed": 0.02,         // Typing speed (seconds between characters)
+    "auto_typing_excluded_apps": []     // Apps to exclude from auto-typing
 }
 ```
 
@@ -141,21 +164,37 @@ The application uses `config.json` for settings. Default configuration is create
 
 ## How It Works
 
-The voice assistant follows a simple workflow for voice-to-text processing and AI response correction:
+Speechy follows a comprehensive workflow for voice-to-text processing, AI correction, and automatic typing:
 
 1. **Hotkey Detection**: User presses the configured hotkey once (default: F9) to start recording
-2. **Audio Recording**: Microphone captures audio in real-time until hotkey is pressed again to stop
-3. **Audio Processing**: When recording stops, audio is saved as a temporary WAV file
+2. **Audio Recording**: Microphone captures audio in real-time with visual level feedback until hotkey is pressed again to stop
+3. **Audio Processing**: When recording stops, audio is saved as a temporary WAV file with duration validation
 4. **Speech-to-Text**: The audio file is processed by OpenAI Whisper (running locally) to convert speech to text
-5. **AI Processing**: The transcribed text is sent to Ollama (local LLM server) to correct transcription errors, remove filler words, and clarify intent
+5. **AI Processing**: The transcribed text is sent to Ollama (local LLM server) to:
+   - Correct transcription errors and grammar
+   - Remove filler words (um, uh, you know, etc.)
+   - Improve clarity while preserving intent
+   - Handle punctuation commands (e.g., "comma", "full stop")
 6. **Results Display**: Both the original transcription and corrected text are displayed in the GUI
-7. **Optional Actions**: Corrected text can be automatically copied to clipboard and logged to file
+7. **Auto-Typing** (Optional): Based on settings, the application can automatically type:
+   - Raw transcription only
+   - Corrected text only  
+   - Both texts sequentially
+8. **Additional Actions**: Text can be automatically copied to clipboard, logged to file, and notifications shown
 
-**Note**: The AI's purpose is transcription correction and clarity, not general conversation. For example:
+### AI Correction Examples:
 - "I called started the server" → "I cold started the server"
-- "I would like to um, start you know the server" → "I would like to start the server"
+- "I would like to um, start you know the server" → "I would like to start the server"  
+- "Send an email to John comma then call Sarah full stop" → "Send an email to John, then call Sarah."
 
-The entire process typically takes 2-5 seconds from speaking to seeing the corrected text, with all processing happening locally for privacy.
+### Auto-Typing Features:
+- Types directly at your current cursor position
+- Configurable typing speed and delay
+- Application exclusion list (prevents typing in password fields, etc.)
+- Works across all applications and text fields
+- Can be toggled on/off with a single button
+
+The entire process typically takes 2-5 seconds from speaking to seeing results, with all processing happening locally for complete privacy.
 
 ## Usage
 
@@ -181,11 +220,13 @@ python main.py
 
 ### GUI Features
 
-- **Main Tab**: Shows recording status, transcription, and AI response
-- **Settings Tab**: Configure hotkeys, models, and features
-- **System Tray**: Right-click for quick access to show/hide/quit
-- **Recording Indicator**: Visual feedback with audio level meter
-- **Manual Recording**: Use the "Start Recording" button as alternative to hotkey
+- **Main Tab**: Shows recording status, transcription, and AI response with copy/clear buttons
+- **Settings Tab**: Configure hotkeys, models, auto-typing, and all features
+- **System Tray**: Right-click for quick access to show/hide/quit/record
+- **Recording Indicator**: Animated visual feedback with real-time audio level meter
+- **Manual Recording**: Use the "Toggle Recording" button as alternative to hotkey
+- **Auto-Type Toggle**: Quick on/off button for auto-typing feature in main interface
+- **Professional About Dialog**: Custom dialog with developer info and clickable links
 
 ### Hotkey Options
 
@@ -349,11 +390,24 @@ For distribution, you can create standalone executables:
 # Install PyInstaller
 pip install pyinstaller
 
-# Create executable
-pyinstaller --onefile --windowed main.py
+# For macOS (recommended - creates .app bundle)
+pyinstaller --onedir --windowed --icon="icon.icns" --name="Speechy" main.py
+
+# For other platforms or single file (not recommended for macOS)
+pyinstaller --onefile --windowed --icon="icon.png" --name="Speechy" main.py
 
 # The executable will be in dist/
+# macOS: dist/Speechy.app (double-clickable application)
+# Others: dist/Speechy/ (directory with executable)
 ```
+
+#### macOS Application Bundle
+The macOS build creates a proper `.app` bundle that:
+- Can be moved to Applications folder
+- Has the correct icon and name
+- Is code-signed for security
+- Includes all dependencies
+- Works without Python installed
 
 ## License
 
@@ -371,6 +425,11 @@ For support and questions:
 3. Open an issue on the project repository
 4. Ensure Ollama and Whisper models are properly installed
 
+## Developer
+
+**Designed and built by Chris Venter**  
+🔗 [Instagram: @myaccessibility](https://www.instagram.com/myaccessibility/)
+
 ---
 
-**Enjoy your new voice assistant! 🎤🤖**
+**Enjoy Speechy - Your AI Voice Assistant! 🎤🤖**

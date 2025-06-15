@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Environment Setup
 
-This is a voice-to-text application using OpenAI Whisper and Ollama. Development requires:
+This is **Speechy - Your AI Voice Assistant**, a comprehensive voice-to-text application using OpenAI Whisper and Ollama with auto-typing capabilities. Development requires:
 
 ```bash
 # Activate conda environment
@@ -52,7 +52,10 @@ for i in range(p.get_device_count()):
 **Build Executable:**
 ```bash
 pip install pyinstaller
-pyinstaller --onefile --windowed --icon="icon.png" main.py
+# For macOS (recommended - creates .app bundle)
+pyinstaller --onedir --windowed --icon="icon.icns" --name="Speechy" main.py
+# Alternative: single file (not recommended for macOS)
+pyinstaller --onefile --windowed --icon="icon.icns" --name="Speechy" main.py
 ```
 
 ## Architecture Overview
@@ -64,7 +67,8 @@ The application follows an event-driven architecture with these key components:
 2. `AudioHandler` captures microphone input to temporary WAV files
 3. `WhisperTranscriber` processes audio files locally using faster-whisper
 4. `OllamaClient` sends transcriptions to local Ollama server for AI responses
-5. `VoiceAssistantGUI` displays results and provides configuration interface
+5. `AutoTyper` types corrected text directly at cursor position (optional)
+6. `VoiceAssistantGUI` displays results and provides configuration interface
 
 **Key Classes and Responsibilities:**
 
@@ -73,12 +77,13 @@ The application follows an event-driven architecture with these key components:
 - **`AudioHandler`** (audio_handler.py): Real-time audio capture with PyAudio, includes level monitoring and temporary file management
 - **`WhisperTranscriber`** (transcriber.py): Local Whisper model loading and transcription with device optimization (CPU/GPU)
 - **`OllamaClient`** (llm_client.py): HTTP client for Ollama API with model management and error handling
-- **`VoiceAssistantGUI`** (gui.py): PyQt5 interface with system tray, tabbed interface, and visual recording indicators
+- **`AutoTyper`** (auto_typer.py): Automatic typing at cursor position with app exclusions and customizable delays
+- **`VoiceAssistantGUI`** (gui.py): PyQt5 interface with system tray, tabbed interface, visual recording indicators, and custom about dialog
 - **`Config`** (config.py): JSON-based configuration management with runtime updates
 
 **Threading Model:**
 - Main thread runs PyQt5 GUI event loop
-- Separate threads for: audio recording, Whisper transcription, Ollama API calls, model loading
+- Separate threads for: audio recording, Whisper transcription, Ollama API calls, model loading, auto-typing
 - Qt signals/slots coordinate between threads and GUI updates
 
 **Configuration System:**
@@ -105,6 +110,12 @@ The application follows an event-driven architecture with these key components:
 **Hotkey Configuration:**
 - Supports F-keys (f9, f10, f11, f12) and modifier combinations (ctrl+space, alt+space)
 - Parsed in `HotkeyManager.parse_hotkey()` method
+
+**Auto-Typing Configuration:**
+- Three modes: "raw" (original transcription), "corrected" (AI-improved), "both" (both texts)
+- Configurable typing delay and speed
+- Application exclusion list to prevent typing in unwanted apps
+- Cross-platform support using pynput
 
 ## Common Development Patterns
 

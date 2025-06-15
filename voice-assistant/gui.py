@@ -123,7 +123,7 @@ class VoiceAssistantGUI(QMainWindow):
         self.setGeometry(100, 100, 800, 600)
         
         # Set application icon (not system tray icon)
-        icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
+        icon_path = os.path.join(os.path.dirname(__file__), "icon.icns")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         

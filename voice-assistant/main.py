@@ -25,9 +25,8 @@ from gui import VoiceAssistantGUI
 def get_logs_dir():
     """Get the logs directory, creating it if it doesn't exist."""
     if getattr(sys, 'frozen', False):
-        # Running as bundled app
-        app_dir = os.path.dirname(sys.executable)
-        logs_dir = os.path.join(app_dir, 'logs')
+        # Running as bundled app - use user home directory
+        logs_dir = os.path.expanduser("~/.speechy/logs")
     else:
         # Running as script
         logs_dir = os.path.join(os.path.dirname(__file__), 'logs')
@@ -37,7 +36,7 @@ def get_logs_dir():
 
 logs_dir = get_logs_dir()
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # Changed to DEBUG for more verbose logging
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler(os.path.join(logs_dir, 'voice_assistant.log')),
@@ -160,6 +159,7 @@ class VoiceAssistant(QObject):
         # State variables
         self.recording = False
         self.current_audio_file: Optional[str] = None
+        self.recording_start_time: Optional[float] = None
         
         # Setup logging directory (already handled by get_logs_dir function)
         
@@ -287,6 +287,7 @@ class VoiceAssistant(QObject):
         try:
             if self.audio_handler and self.audio_handler.start_recording():
                 self.recording = True
+                self.recording_start_time = time.time()  # Track recording start time
                 if self.gui:
                     self.gui.set_recording_state(True)
                 logger.info("Recording started")
@@ -307,14 +308,40 @@ class VoiceAssistant(QObject):
         
         try:
             self.recording = False
+            recording_duration = 0.0
+            if self.recording_start_time:
+                recording_duration = time.time() - self.recording_start_time
+                logger.info(f"Recording duration: {recording_duration:.2f} seconds")
+            
             if self.gui:
                 self.gui.set_recording_state(False)
+            
+            # Check minimum recording duration
+            if recording_duration < 0.5:  # Less than half a second
+                logger.warning(f"Recording too short ({recording_duration:.2f}s), may not contain meaningful speech")
+                if self.gui:
+                    self.gui.statusBar().showMessage("Recording too short - please speak for at least 1 second", 4000)
+                return
             
             if self.audio_handler:
                 self.current_audio_file = self.audio_handler.stop_recording()
                 
                 if self.current_audio_file:
                     logger.info(f"Recording stopped, saved to: {self.current_audio_file}")
+                    
+                    # For debugging: save a copy of the audio file in bundled apps
+                    if getattr(sys, 'frozen', False):
+                        try:
+                            import shutil
+                            debug_dir = os.path.expanduser("~/.speechy/debug_audio")
+                            os.makedirs(debug_dir, exist_ok=True)
+                            timestamp = time.strftime("%Y%m%d_%H%M%S")
+                            debug_file = os.path.join(debug_dir, f"recording_{timestamp}.wav")
+                            shutil.copy2(self.current_audio_file, debug_file)
+                            logger.info(f"Debug: saved audio copy to {debug_file}")
+                        except Exception as e:
+                            logger.warning(f"Could not save debug audio copy: {e}")
+                    
                     # Process the audio asynchronously
                     self.process_audio_async(self.current_audio_file)
                 else:
@@ -479,7 +506,15 @@ Fix this transcription:"""
         """Log transcription to file."""
         try:
             log_file = self.config.get_log_file()
-            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+            
+            # Handle bundled app read-only filesystem
+            if getattr(sys, 'frozen', False):
+                # Use user home directory for logs in bundled app
+                log_dir = os.path.expanduser("~/.speechy/logs")
+                os.makedirs(log_dir, exist_ok=True)
+                log_file = os.path.join(log_dir, "transcriptions.log")
+            else:
+                os.makedirs(os.path.dirname(log_file), exist_ok=True)
             
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
             with open(log_file, 'a', encoding='utf-8') as f:
@@ -546,8 +581,26 @@ Fix this transcription:"""
 def main():
     """Main application entry point."""
     try:
-        # Create QApplication
+        # Create QApplication with instance checking
         app = QApplication(sys.argv)
+        
+        # Check if another instance is already running
+        app.setApplicationName("VoiceAssistant")
+        app.setApplicationVersion("1.0")
+        
+        # Prevent multiple instances using Qt's built-in mechanism
+        import socket
+        
+        # Try to create a local socket server to detect other instances
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.bind(('127.0.0.1', 8765))  # Use a specific port for this app
+            sock.listen(1)
+        except socket.error:
+            logger.error("Another instance of Voice Assistant is already running")
+            QMessageBox.warning(None, "Voice Assistant", "Another instance is already running!")
+            sys.exit(1)
+        
         app.setQuitOnLastWindowClosed(False)  # Keep running when window is closed
         
         # Create voice assistant
@@ -565,7 +618,11 @@ def main():
         
         # Handle application shutdown
         def cleanup():
-            assistant.stop()
+            try:
+                assistant.stop()
+                sock.close()  # Clean up the socket
+            except:
+                pass
         
         app.aboutToQuit.connect(cleanup)
         
@@ -594,4 +651,6 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()  # Required for PyInstaller on Windows/macOS
     main()

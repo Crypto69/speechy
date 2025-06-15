@@ -32,7 +32,19 @@ class Config:
         Args:
             config_file: Path to configuration file
         """
-        self.config_file = config_file
+        import sys
+        
+        # Handle bundled app read-only filesystem issue
+        if getattr(sys, 'frozen', False):
+            # Running as bundled app - use user's home directory for config
+            import os.path
+            config_dir = os.path.expanduser("~/.speechy")
+            os.makedirs(config_dir, exist_ok=True)
+            self.config_file = os.path.join(config_dir, "config.json")
+            logger.info(f"Using bundled app config location: {self.config_file}")
+        else:
+            self.config_file = config_file
+        
         self.config: Dict[str, Any] = {}
         self.load_config()
     

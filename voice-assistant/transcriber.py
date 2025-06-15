@@ -94,11 +94,6 @@ class WhisperTranscriber:
                 app_dir = os.path.dirname(sys.executable)
                 download_root = os.path.join(app_dir, 'whisper_models')
                 
-                # Force a more reliable model for bundled apps
-                if self.model_size == "small.en":
-                    logger.info("Forcing 'base' model for bundled app (small.en has issues)")
-                    self.model_size = "base"
-                
                 # Try to create the directory, but don't fail if we can't due to read-only filesystem
                 try:
                     os.makedirs(download_root, exist_ok=True)

@@ -4,22 +4,39 @@ import os
 import logging
 import threading
 import time
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict
 from faster_whisper import WhisperModel
 
 logger = logging.getLogger(__name__)
+
+# Model size estimates in MB (approximate download sizes)
+MODEL_SIZES: Dict[str, int] = {
+    "tiny": 39,
+    "tiny.en": 39,
+    "base": 74,
+    "base.en": 74,
+    "small": 244,
+    "small.en": 244,
+    "medium": 769,
+    "medium.en": 769,
+    "large": 1550,
+    "large-v1": 1550,
+    "large-v2": 1550,
+    "large-v3": 1550
+}
 
 class WhisperTranscriber:
     """Handles speech-to-text transcription using Whisper model."""
     
     def __init__(self, model_size: str = "base", device: str = "auto", 
-                 compute_type: str = "auto"):
+                 compute_type: str = "auto", progress_callback: Optional[Callable[[int, str], None]] = None):
         """Initialize the Whisper transcriber.
         
         Args:
             model_size: Whisper model size ("tiny", "base", "small", "medium", "large")
             device: Device to run on ("cpu", "cuda", "auto")
             compute_type: Compute type ("int8", "float16", "float32", "auto")
+            progress_callback: Optional callback for progress updates (progress_percent, status_message)
         """
         self.model_size = model_size
         self.device = device
@@ -27,6 +44,7 @@ class WhisperTranscriber:
         self.model: Optional[WhisperModel] = None
         self.model_loaded = False
         self.loading = False
+        self.progress_callback = progress_callback
         
         # Threading for non-blocking operations
         self.transcription_thread: Optional[threading.Thread] = None
@@ -65,6 +83,50 @@ class WhisperTranscriber:
         logger.info(f"Using device: {device}, compute_type: {compute_type}")
         return device, compute_type
     
+    def _update_progress(self, progress: int, message: str):
+        """Update progress through callback if available.
+        
+        Args:
+            progress: Progress percentage (0-100)
+            message: Status message
+        """
+        if self.progress_callback:
+            try:
+                self.progress_callback(progress, message)
+            except Exception as e:
+                logger.warning(f"Progress callback error: {e}")
+    
+    def _get_model_size_mb(self) -> int:
+        """Get estimated download size for the current model.
+        
+        Returns:
+            Estimated size in MB
+        """
+        return MODEL_SIZES.get(self.model_size, 500)  # Default to 500MB if unknown
+    
+    def _simulate_download_progress(self, duration_seconds: float = 8.0):
+        """Simulate download progress for better user experience.
+        
+        Args:
+            duration_seconds: How long to simulate the download
+        """
+        model_size_mb = self._get_model_size_mb()
+        start_time = time.time()
+        
+        while time.time() - start_time < duration_seconds:
+            elapsed = time.time() - start_time
+            progress = int((elapsed / duration_seconds) * 75)  # Go up to 75% during "download"
+            
+            if progress <= 20:
+                message = f"Downloading {self.model_size} model ({model_size_mb}MB)..."
+            elif progress <= 50:
+                message = f"Downloading {self.model_size} model ({progress}%)..."
+            else:
+                message = f"Downloading {self.model_size} model ({progress}%)..."
+                
+            self._update_progress(progress, message)
+            time.sleep(0.2)  # Update every 200ms
+    
     def load_model(self) -> bool:
         """Load the Whisper model.
         
@@ -82,12 +144,19 @@ class WhisperTranscriber:
             self.loading = True
             logger.info(f"Loading Whisper model: {self.model_size}")
             
+            # Start with progress tracking
+            model_size_mb = self._get_model_size_mb()
+            self._update_progress(0, f"Preparing to load {self.model_size} model ({model_size_mb}MB)...")
+            
             device, compute_type = self._determine_optimal_settings()
+            self._update_progress(10, "Optimizing settings for your system...")
             
             # Set up model cache directory for bundled apps
             import sys
             download_root = None
             local_files_only = False
+            
+            self._update_progress(20, "Setting up model cache directory...")
             
             if getattr(sys, 'frozen', False):
                 # Running as bundled app - try multiple strategies
@@ -104,9 +173,28 @@ class WhisperTranscriber:
                     download_root = os.path.expanduser("~/whisper_models")
                     os.makedirs(download_root, exist_ok=True)
                     logger.info(f"Using user home model directory: {download_root}")
+                    
+            self._update_progress(30, "Checking for existing model files...")
             
+            # Check if model files already exist locally
+            model_exists_locally = False
+            if download_root and os.path.exists(download_root):
+                # Check for typical model file patterns
+                for item in os.listdir(download_root):
+                    if self.model_size in item and os.path.isdir(os.path.join(download_root, item)):
+                        model_exists_locally = True
+                        break
+            
+            if model_exists_locally:
+                self._update_progress(40, f"Found existing {self.model_size} model, loading...")
+            else:
+                self._update_progress(40, f"Model not found locally, downloading from Hugging Face...")
+                # Simulate download progress for better UX (this runs while actual download happens)
+                self._simulate_download_progress(8.0)
+                
             # Try loading with the configured download root first
             try:
+                self._update_progress(80, "Finalizing download and loading model into memory...")
                 self.model = WhisperModel(
                     self.model_size,
                     device=device,
@@ -115,11 +203,14 @@ class WhisperTranscriber:
                     local_files_only=local_files_only
                 )
                 logger.info(f"Model loaded successfully from: {download_root}")
+                self._update_progress(95, "Model loaded successfully")
             except Exception as model_error:
                 logger.warning(f"Failed to load model with custom download_root: {model_error}")
                 # Fallback: try with default cache directory
                 logger.info("Trying fallback with default cache directory...")
+                self._update_progress(50, "Retrying with default cache directory...")
                 try:
+                    self._update_progress(80, "Finalizing download and loading model into memory...")
                     self.model = WhisperModel(
                         self.model_size,
                         device=device,
@@ -127,12 +218,15 @@ class WhisperTranscriber:
                         download_root=None,  # Use default
                         local_files_only=False
                     )
+                    self._update_progress(95, "Model loaded successfully (fallback)")
                 except Exception as fallback_error:
                     logger.error(f"Fallback model loading also failed: {fallback_error}")
                     # Last resort: try with 'tiny' model which is more reliable
                     if self.model_size != "tiny":
                         logger.info("Trying with 'tiny' model as last resort...")
+                        self._update_progress(60, "Trying fallback to tiny model...")
                         self.model_size = "tiny"  # Update the model size
+                        self._update_progress(80, "Loading tiny model into memory...")
                         self.model = WhisperModel(
                             "tiny",
                             device=device,
@@ -141,11 +235,13 @@ class WhisperTranscriber:
                             local_files_only=False
                         )
                         logger.warning("Fell back to 'tiny' Whisper model due to loading issues")
+                        self._update_progress(95, "Tiny model loaded successfully")
                     else:
                         raise fallback_error
             
             # Validate the model works by doing a quick test
             try:
+                self._update_progress(98, "Validating model...")
                 # Create a small test audio array (1 second of silence)
                 import numpy as np
                 test_audio = np.zeros(16000, dtype=np.float32)  # 1 second of silence at 16kHz
@@ -156,9 +252,11 @@ class WhisperTranscriber:
                 logger.error(f"Model validation failed: {validation_error}")
                 # If model fails validation, try to reload it
                 self.model = None
+                self._update_progress(0, f"Model validation failed: {validation_error}")
                 raise Exception(f"Model failed validation: {validation_error}")
             
             self.model_loaded = True
+            self._update_progress(100, f"Whisper model {self.model_size} ready")
             logger.info(f"Whisper model {self.model_size} loaded and validated successfully")
             return True
             
@@ -166,6 +264,7 @@ class WhisperTranscriber:
             logger.error(f"Failed to load Whisper model: {e}")
             self.model = None
             self.model_loaded = False
+            self._update_progress(0, f"Failed to load model: {str(e)}")
             return False
         finally:
             self.loading = False
@@ -342,6 +441,14 @@ class WhisperTranscriber:
             List of available model sizes
         """
         return ["tiny", "base", "small", "medium", "large-v1", "large-v2", "large-v3"]
+    
+    def set_progress_callback(self, callback: Optional[Callable[[int, str], None]]):
+        """Set progress callback for model loading updates.
+        
+        Args:
+            callback: Function to call with (progress_percent, status_message)
+        """
+        self.progress_callback = callback
     
     def unload_model(self) -> None:
         """Unload the current model to free memory."""

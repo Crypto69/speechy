@@ -190,11 +190,13 @@ class VoiceAssistantGUI(QMainWindow):
         
         # Manual recording button
         self.record_button = QPushButton("Toggle Recording")
+        self.record_button.setProperty("class", "primary")
         self.record_button.clicked.connect(self.toggle_recording)
         status_layout.addWidget(self.record_button)
         
         # Auto-typing toggle button
         self.auto_typing_button = QPushButton("Auto-Type: OFF")
+        self.auto_typing_button.setProperty("class", "secondary")
         self.auto_typing_button.setCheckable(True)
         self.auto_typing_button.setChecked(self.config.is_auto_typing_enabled())
         self.auto_typing_button.clicked.connect(self.toggle_auto_typing)
@@ -243,10 +245,12 @@ class VoiceAssistantGUI(QMainWindow):
         button_layout = QHBoxLayout()
         
         self.copy_transcription_btn = QPushButton("Copy Transcription")
+        self.copy_transcription_btn.setProperty("class", "secondary")
         self.copy_transcription_btn.clicked.connect(self.copy_transcription)
         button_layout.addWidget(self.copy_transcription_btn)
         
         self.copy_response_btn = QPushButton("Copy Response")
+        self.copy_response_btn.setProperty("class", "primary")
         self.copy_response_btn.clicked.connect(self.copy_response)
         button_layout.addWidget(self.copy_response_btn)
         
@@ -311,10 +315,17 @@ class VoiceAssistantGUI(QMainWindow):
         self.ollama_combo = QComboBox()
         self.ollama_combo.setEditable(True)
         self.ollama_combo.setMinimumWidth(200)
+        
+        # Add initial content to make dropdown obvious
+        current_ollama_model = self.config.get_ollama_model()
+        self.ollama_combo.addItem(current_ollama_model)
+        self.ollama_combo.setCurrentText(current_ollama_model)
+        
         ollama_layout.addWidget(self.ollama_combo)
         
         # Add refresh button for models
         self.refresh_models_btn = QPushButton("🔄")
+        self.refresh_models_btn.setProperty("class", "secondary")
         self.refresh_models_btn.setMaximumWidth(30)
         self.refresh_models_btn.setToolTip("Refresh available models from Ollama")
         self.refresh_models_btn.clicked.connect(self.refresh_ollama_models)
@@ -379,6 +390,7 @@ class VoiceAssistantGUI(QMainWindow):
         # Test button
         test_layout = QHBoxLayout()
         self.auto_typing_test_btn = QPushButton("Test Auto-Typing")
+        self.auto_typing_test_btn.setProperty("class", "secondary")
         self.auto_typing_test_btn.clicked.connect(self.test_auto_typing)
         test_layout.addWidget(self.auto_typing_test_btn)
         test_layout.addStretch()
@@ -390,6 +402,7 @@ class VoiceAssistantGUI(QMainWindow):
         save_layout = QHBoxLayout()
         save_layout.addStretch()
         self.save_settings_btn = QPushButton("Save Settings")
+        self.save_settings_btn.setProperty("class", "primary")
         self.save_settings_btn.clicked.connect(self.save_settings)
         save_layout.addWidget(self.save_settings_btn)
         layout.addLayout(save_layout)
@@ -426,17 +439,13 @@ class VoiceAssistantGUI(QMainWindow):
         
         tray_menu.addSeparator()
         
-        show_action = QAction("Show", self)
-        show_action.triggered.connect(self.show_window)
-        tray_menu.addAction(show_action)
-        
-        hide_action = QAction("Hide", self)
-        hide_action.triggered.connect(self.hide)
-        tray_menu.addAction(hide_action)
+        self.settings_action = QAction("Settings...", self)
+        self.settings_action.triggered.connect(self.toggle_window)
+        tray_menu.addAction(self.settings_action)
         
         tray_menu.addSeparator()
         
-        about_action = QAction("About", self)
+        about_action = QAction("About...", self)
         about_action.triggered.connect(self.show_about)
         tray_menu.addAction(about_action)
         
@@ -489,7 +498,7 @@ class VoiceAssistantGUI(QMainWindow):
                 QGroupBox {
                     font-weight: bold;
                     border: 2px solid #555555;
-                    border-radius: 5px;
+                    border-radius: 12px;
                     margin-top: 10px;
                     padding-top: 10px;
                 }
@@ -501,14 +510,16 @@ class VoiceAssistantGUI(QMainWindow):
                 QTextEdit {
                     background-color: #3c3c3c;
                     border: 1px solid #555555;
-                    border-radius: 3px;
+                    border-radius: 8px;
+                    padding: 8px;
                 }
                 QPushButton {
                     background-color: #4a4a4a;
                     border: 1px solid #555555;
-                    border-radius: 3px;
-                    padding: 5px;
+                    border-radius: 8px;
+                    padding: 8px 16px;
                     min-width: 80px;
+                    font-weight: 500;
                 }
                 QPushButton:hover {
                     background-color: #5a5a5a;
@@ -516,11 +527,144 @@ class VoiceAssistantGUI(QMainWindow):
                 QPushButton:pressed {
                     background-color: #3a3a3a;
                 }
+                /* Primary action buttons (blue) */
+                QPushButton[class="primary"] {
+                    background-color: #007AFF;
+                    border: 1px solid #007AFF;
+                    color: white;
+                }
+                QPushButton[class="primary"]:hover {
+                    background-color: #0056CC;
+                    border: 1px solid #0056CC;
+                }
+                QPushButton[class="primary"]:pressed {
+                    background-color: #003D99;
+                }
+                /* Secondary action buttons (muted blue) */
+                QPushButton[class="secondary"] {
+                    background-color: #34426B;
+                    border: 1px solid #4A5A8A;
+                    color: #B0C4DE;
+                }
+                QPushButton[class="secondary"]:hover {
+                    background-color: #4A5A8A;
+                    color: white;
+                }
+                QPushButton[class="secondary"]:pressed {
+                    background-color: #2A3654;
+                }
+                /* Success/Active state buttons (green) */
+                QPushButton[class="success"] {
+                    background-color: #34C759;
+                    border: 1px solid #34C759;
+                    color: white;
+                    font-weight: 600;
+                }
+                QPushButton[class="success"]:hover {
+                    background-color: #28A745;
+                    border: 1px solid #28A745;
+                }
+                QPushButton[class="success"]:pressed {
+                    background-color: #1E7E34;
+                }
                 QComboBox {
                     background-color: #4a4a4a;
                     border: 1px solid #555555;
-                    border-radius: 3px;
-                    padding: 3px;
+                    border-radius: 8px;
+                    padding: 6px 30px 6px 10px;
+                    min-width: 120px;
+                    color: #ffffff;
+                }
+                QComboBox:hover {
+                    border: 1px solid #007AFF;
+                    background-color: #5a5a5a;
+                }
+                QComboBox:focus {
+                    border: 2px solid #007AFF;
+                }
+                QComboBox::drop-down {
+                    subcontrol-origin: padding;
+                    subcontrol-position: top right;
+                    width: 25px;
+                    border: none;
+                    background-color: #555555;
+                    border-top-right-radius: 8px;
+                    border-bottom-right-radius: 8px;
+                }
+                QComboBox::drop-down:hover {
+                    background-color: #007AFF;
+                }
+                QComboBox::down-arrow {
+                    image: url(data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23ffffff' d='M5 6L0 0h10z'/%3E%3C/svg%3E);
+                    width: 10px;
+                    height: 6px;
+                }
+                QComboBox QAbstractItemView {
+                    background-color: #4a4a4a;
+                    border: 1px solid #555555;
+                    border-radius: 8px;
+                    selection-background-color: #007AFF;
+                    color: #ffffff;
+                    padding: 4px;
+                }
+                QComboBox QAbstractItemView::item {
+                    padding: 8px;
+                    border-radius: 4px;
+                    margin: 1px;
+                }
+                QComboBox QAbstractItemView::item:hover {
+                    background-color: #007AFF;
+                }
+                QSpinBox {
+                    background-color: #4a4a4a;
+                    border: 1px solid #555555;
+                    border-radius: 8px;
+                    padding: 6px;
+                }
+                QCheckBox {
+                    spacing: 8px;
+                }
+                QCheckBox::indicator {
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 4px;
+                    border: 2px solid #555555;
+                    background-color: #3a3a3a;
+                }
+                QCheckBox::indicator:checked {
+                    border: 2px solid #007AFF;
+                    background-color: #007AFF;
+                }
+                QProgressBar {
+                    border: 1px solid #555555;
+                    border-radius: 8px;
+                    text-align: center;
+                    background-color: #3a3a3a;
+                }
+                QProgressBar::chunk {
+                    background-color: #007AFF;
+                    border-radius: 7px;
+                }
+                QTabWidget::pane {
+                    border: 1px solid #555555;
+                    border-radius: 8px;
+                    background-color: #2b2b2b;
+                }
+                QTabBar::tab {
+                    background-color: #4a4a4a;
+                    border: 1px solid #555555;
+                    border-bottom: none;
+                    border-top-left-radius: 8px;
+                    border-top-right-radius: 8px;
+                    padding: 8px 16px;
+                    margin-right: 2px;
+                }
+                QTabBar::tab:selected {
+                    background-color: #007AFF;
+                    color: white;
+                }
+                QTabBar::tab:hover {
+                    background-color: #5a5a5a;
                 }
             """)
     
@@ -612,12 +756,54 @@ class VoiceAssistantGUI(QMainWindow):
         
         if loading:
             self.progress_bar.setVisible(True)
-            self.progress_bar.setRange(0, 0)  # Indeterminate progress
+            self.progress_bar.setRange(0, 0)  # Indeterminate progress (will be overridden by progress updates)
         else:
             self.progress_bar.setVisible(False)
             if not self.transcribing and not self.generating:
                 self.status_label.setText("Ready")
                 self.statusBar().showMessage("Ready")
+    
+    def set_model_loading_progress(self, progress: int, message: str):
+        """Update model loading progress with specific percentage and message.
+        
+        Args:
+            progress: Progress percentage (0-100)
+            message: Status message to display
+        """
+        self.model_loading = True
+        
+        # Show progress bar with determinate progress
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(progress)
+        
+        # Update status
+        self.status_label.setText(message)
+        self.statusBar().showMessage(message)
+        
+        # Disable recording while loading
+        self.record_button.setEnabled(False)
+        
+        # If progress is complete, hide progress bar after a short delay
+        if progress >= 100:
+            # Use a timer to hide the progress bar after showing completion briefly
+            QTimer.singleShot(1000, self._hide_progress_after_completion)
+    
+    def _hide_progress_after_completion(self):
+        """Hide progress bar after model loading completion."""
+        self.model_loading = False
+        self.progress_bar.setVisible(False)
+        self.record_button.setEnabled(True)
+        
+        # Also enable tray menu recording actions
+        if hasattr(self, 'start_recording_action'):
+            self.start_recording_action.setEnabled(True)
+        if hasattr(self, 'stop_recording_action'):
+            self.stop_recording_action.setEnabled(True)
+            
+        if not self.transcribing and not self.generating:
+            self.status_label.setText("Ready")
+            self.statusBar().showMessage("Ready")
     
     def set_transcription(self, text: str):
         """Set transcription text."""
@@ -696,26 +882,28 @@ class VoiceAssistantGUI(QMainWindow):
         enabled = self.auto_typing_button.isChecked()
         self.auto_typing_button.setText(f"Auto-Type: {'ON' if enabled else 'OFF'}")
         
-        # Update button styling
+        # Update button class property based on state
         if enabled:
-            self.auto_typing_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #4CAF50;
-                    color: white;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #45a049;
-                }
-            """)
+            self.auto_typing_button.setProperty("class", "success")
         else:
-            self.auto_typing_button.setStyleSheet("")
+            self.auto_typing_button.setProperty("class", "secondary")
+        
+        # Force style refresh
+        self.auto_typing_button.style().unpolish(self.auto_typing_button)
+        self.auto_typing_button.style().polish(self.auto_typing_button)
     
     def show_window(self):
         """Show the main window."""
         self.show()
         self.raise_()
         self.activateWindow()
+    
+    def toggle_window(self):
+        """Toggle the main window visibility."""
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show_window()
     
     def tray_icon_activated(self, reason):
         """Handle tray icon activation."""
@@ -896,12 +1084,12 @@ class VoiceAssistantGUI(QMainWindow):
             # Store current selection
             current_model = self.config.get_ollama_model()
             
-            # Clear and populate with new models
-            self.ollama_combo.clear()
-            
             if model_names:
+                # Clear and populate with new models
+                self.ollama_combo.clear()
+                
                 # Sort models for better UX
-                sorted_models = sorted(model_names)
+                sorted_models = sorted(set(model_names))  # Remove duplicates
                 self.ollama_combo.addItems(sorted_models)
                 
                 # Set current model if it exists in the list
@@ -912,7 +1100,8 @@ class VoiceAssistantGUI(QMainWindow):
                     self.ollama_combo.addItem(current_model)
                     self.ollama_combo.setCurrentText(current_model)
                 
-                self.statusBar().showMessage(f"Found {len(model_names)} Ollama models", 2000)
+                self.statusBar().showMessage(f"Found {len(sorted_models)} Ollama models", 2000)
+                logger.info(f"Loaded Ollama models: {sorted_models}")
             else:
                 # Use fallback models if no models found
                 self._use_fallback_models()

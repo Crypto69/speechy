@@ -30,6 +30,7 @@ class VoiceAssistant(QObject):
     # Signals for thread-safe GUI updates
     audio_level_signal = pyqtSignal(float)
     model_loading_signal = pyqtSignal(bool)
+    model_loading_progress_signal = pyqtSignal(int, str)  # progress_percent, message
     status_message_signal = pyqtSignal(str)
     
     def __init__(self):
@@ -71,9 +72,10 @@ class VoiceAssistant(QObject):
             self.audio_handler.set_audio_level_callback(self.on_audio_level_update)
             logger.info("Audio handler initialized")
             
-            # Initialize transcriber
+            # Initialize transcriber with progress callback
             self.transcriber = WhisperTranscriber(
-                model_size=self.config.get_whisper_model()
+                model_size=self.config.get_whisper_model(),
+                progress_callback=self.on_model_loading_progress
             )
             logger.info("Transcriber initialized")
             
@@ -136,6 +138,7 @@ class VoiceAssistant(QObject):
             
             # Connect model loading signals
             self.model_loading_signal.connect(self.gui.set_model_loading_state)
+            self.model_loading_progress_signal.connect(self.gui.set_model_loading_progress)
             self.status_message_signal.connect(self.gui.statusBar().showMessage)
             
             # Ensure auto-typer settings are synchronized with current config
@@ -269,6 +272,16 @@ class VoiceAssistant(QObject):
         if self.gui and self.recording:
             self.audio_level_signal.emit(float(level))
     
+    def on_model_loading_progress(self, progress: int, message: str):
+        """Handle model loading progress updates.
+        
+        Args:
+            progress: Progress percentage (0-100)
+            message: Status message
+        """
+        # Emit signal for thread-safe GUI update
+        self.model_loading_progress_signal.emit(progress, message)
+    
     def on_settings_changed(self, new_settings: dict):
         """Handle settings changes from GUI."""
         try:
@@ -281,7 +294,8 @@ class VoiceAssistant(QObject):
             if new_settings.get('whisper_model') != self.config.get_whisper_model():
                 # Reload transcriber with new model
                 self.transcriber = WhisperTranscriber(
-                    model_size=new_settings.get('whisper_model', 'base')
+                    model_size=new_settings.get('whisper_model', 'base'),
+                    progress_callback=self.on_model_loading_progress
                 )
                 self.audio_processor.set_components(transcriber=self.transcriber)
                 self.load_models_async()

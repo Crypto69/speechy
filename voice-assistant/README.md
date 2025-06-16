@@ -391,24 +391,36 @@ For distribution, you can create standalone executables:
 # Install PyInstaller
 pip install pyinstaller
 
-# For macOS (recommended - creates .app bundle)
+# Build using the spec file (recommended)
+pyinstaller speechy.spec
+
+# The app will be created at:
+# dist/Speechy.app (macOS application bundle)
+```
+
+#### Alternative Build Methods
+
+```bash
+# Cross-platform generic build (if spec file doesn't work)
 pyinstaller --onedir --windowed --icon="icon.icns" --name="Speechy" main.py
 
-# For other platforms or single file (not recommended for macOS)
-pyinstaller --onefile --windowed --icon="icon.png" --name="Speechy" main.py
-
-# The executable will be in dist/
-# macOS: dist/Speechy.app (double-clickable application)
-# Others: dist/Speechy/ (directory with executable)
+# Single file build (not recommended for macOS)
+pyinstaller --onefile --windowed --icon="icon.icns" --name="Speechy" main.py
 ```
 
 #### macOS Application Bundle
-The macOS build creates a proper `.app` bundle that:
+The `speechy.spec` build creates a proper `.app` bundle that:
 - Can be moved to Applications folder
-- Has the correct icon and name
-- Is code-signed for security
-- Includes all dependencies
-- Works without Python installed
+- Has the correct icon and name in Finder and Launchpad
+- Integrates properly with macOS (appears in Spotlight, etc.)
+- Includes all dependencies in a single distributable file
+- Works without Python installed on the target machine
+- Follows macOS application conventions and structure
+
+#### Build Files Explanation
+- **`speechy.spec`**: PyInstaller specification file with optimized settings for macOS
+- **`dist/Speechy.app`**: Final application bundle ready for distribution
+- **`build/`**: Temporary build files (can be deleted after building)
 
 ## License
 

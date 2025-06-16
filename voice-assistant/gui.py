@@ -3,6 +3,7 @@
 import sys
 import os
 import logging
+import time
 from typing import Optional, Callable
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
                             QWidget, QLabel, QPushButton, QTextEdit, QProgressBar,
@@ -1012,30 +1013,74 @@ class VoiceAssistantGUI(QMainWindow):
             self.tray_icon.showMessage(title, message, QSystemTrayIcon.Information, 3000)
     
     def test_auto_typing(self):
-        """Test auto-typing functionality."""
+        """Test auto-typing functionality with countdown."""
         try:
+            # Find the auto_typer instance
+            auto_typer = None
+            
             # Access the parent voice assistant to get the auto_typer
             parent_widget = self.parent()
             while parent_widget:
-                if hasattr(parent_widget, 'auto_typer'):
-                    if parent_widget.auto_typer:
-                        parent_widget.auto_typer.test_typing()
-                        self.statusBar().showMessage("Auto-typing test initiated - watch for test text", 3000)
-                        return
+                if hasattr(parent_widget, 'auto_typer') and parent_widget.auto_typer:
+                    auto_typer = parent_widget.auto_typer
                     break
                 parent_widget = parent_widget.parent() if hasattr(parent_widget, 'parent') else None
             
-            # If we can't find the auto_typer via parent, try global variable (should be set in main)
-            if hasattr(self, '_voice_assistant') and self._voice_assistant:
+            # If we can't find the auto_typer via parent, try global variable
+            if not auto_typer and hasattr(self, '_voice_assistant') and self._voice_assistant:
                 if self._voice_assistant.auto_typer:
-                    self._voice_assistant.auto_typer.test_typing()
-                    self.statusBar().showMessage("Auto-typing test initiated - watch for test text", 3000)
-                    return
+                    auto_typer = self._voice_assistant.auto_typer
             
-            self.statusBar().showMessage("Auto-typer not accessible - check initialization", 3000)
+            if not auto_typer:
+                self.statusBar().showMessage("Auto-typer not accessible - check initialization", 3000)
+                return
+            
+            # Check if auto-typing is enabled
+            if not auto_typer.enabled:
+                self.statusBar().showMessage("Auto-typing is disabled - please enable it first", 3000)
+                return
+            
+            # Disable the test button during countdown
+            self.auto_typing_test_btn.setEnabled(False)
+            
+            # Start countdown in a separate thread
+            import threading
+            
+            def countdown_and_type():
+                try:
+                    # Countdown from 5 to 1
+                    for i in range(5, 0, -1):
+                        # Update status bar on main thread
+                        self.statusBar().showMessage(f"Auto-typing test starts in {i}...", 1000)
+                        time.sleep(1)
+                    
+                    # Show final message
+                    self.statusBar().showMessage("Auto-typing test starting now!", 1000)
+                    
+                    # Type the test message
+                    test_message = "If you see this text it confirms that auto typing is working and that accessibility settings have been enabled."
+                    
+                    # Type the message using the auto_typer
+                    auto_typer.type_text_async(test_message, 
+                        lambda success, msg: self.statusBar().showMessage(
+                            f"Auto-typing test {'completed successfully' if success else 'failed'}", 3000
+                        )
+                    )
+                    
+                except Exception as e:
+                    logger.error(f"Auto-typing countdown test failed: {e}")
+                    self.statusBar().showMessage(f"Auto-typing test failed: {e}", 3000)
+                finally:
+                    # Re-enable the test button on main thread
+                    self.auto_typing_test_btn.setEnabled(True)
+            
+            # Start the countdown thread
+            countdown_thread = threading.Thread(target=countdown_and_type, daemon=True)
+            countdown_thread.start()
             
         except Exception as e:
             self.statusBar().showMessage(f"Auto-typing test failed: {e}", 3000)
+            self.auto_typing_test_btn.setEnabled(True)
     
     def _populate_ollama_models_async(self):
         """Populate Ollama models list asynchronously."""

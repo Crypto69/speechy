@@ -214,6 +214,9 @@ class VoiceAssistant(QObject):
                 self.recording = True
                 self.recording_start_time = time.time()  # Track recording start time
                 if self.gui:
+                    # Clear transcription boxes when recording starts
+                    self.gui.set_transcription("")
+                    self.gui.set_response("")
                     self.gui.set_recording_state(True)
                 logger.info("Recording started")
             else:

@@ -49,14 +49,38 @@ for i in range(p.get_device_count()):
 "
 ```
 
+**Install macOS Dependencies:**
+```bash
+# Install required PyObjC frameworks for permission checking
+pip install pyobjc-framework-Cocoa pyobjc-framework-AVFoundation pyobjc-framework-Quartz pyobjc-framework-Foundation pyobjc-framework-ApplicationServices
+```
+
 **Build Executable:**
 ```bash
 pip install pyinstaller
-# For macOS (recommended - creates .app bundle)
-pyinstaller --onedir --windowed --icon="icon.icns" --name="Speechy" main.py
-# Alternative: single file (not recommended for macOS)
-pyinstaller --onefile --windowed --icon="icon.icns" --name="Speechy" main.py
+# Use the configured spec file (includes Info.plist and entitlements for permissions)
+pyinstaller speechy.spec
 ```
+
+**macOS Permissions:**
+The app requires three permissions on macOS:
+1. **Input Monitoring** - For global hotkeys (F9, etc.)
+2. **Accessibility** - For auto-typing functionality  
+3. **Microphone** - For voice recording
+
+**Permission Management:**
+- The app includes a dedicated "🔐 Permissions" tab with visual status indicators
+- Real-time permission checking with ✅/❌ status display
+- Direct links to System Settings for each permission type
+- Automatic permission request on first launch using proper macOS APIs
+- Built with proper entitlements file for microphone access
+
+**First Launch:**
+1. App will automatically request Input Monitoring permission (approve this)
+2. App will show Permissions tab if any permissions are missing
+3. Use "Open Settings" buttons to grant remaining permissions
+4. Use "Refresh Status" to update permission display
+5. All permissions should show ✅ when properly granted
 
 ## Architecture Overview
 

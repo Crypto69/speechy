@@ -5,6 +5,8 @@ import os
 import logging
 import socket
 import multiprocessing
+import platform
+import subprocess
 from PyQt5.QtWidgets import QApplication, QMessageBox
 
 logger = logging.getLogger(__name__)
@@ -71,13 +73,46 @@ class ApplicationManager:
     
     def initialize_voice_assistant(self):
         """Initialize the voice assistant components."""
+        # Use comprehensive permission manager
+        from permission_manager import PermissionManager
+        
+        logger.info("Initializing comprehensive permission checking...")
+        permission_manager = PermissionManager()
+        permissions = permission_manager.check_all_permissions()
+        
+        # Log the results
+        if permissions['accessibility']:
+            logger.info("✅ Accessibility permissions ready - hotkeys and auto-typing will work")
+        else:
+            logger.warning("⚠️  Accessibility permissions missing - hotkeys and auto-typing will not work")
+        
+        if permissions['input_monitoring']:
+            logger.info("✅ Input monitoring permissions ready - global hotkeys will work")
+        else:
+            logger.warning("⚠️  Input monitoring permissions missing - global hotkeys will not work")
+        
+        if permissions['microphone']:
+            logger.info("✅ Microphone permissions ready - recording will work")
+        else:
+            logger.warning("⚠️  Microphone permissions missing - recording will not work")
+        
         from voice_assistant import VoiceAssistant
         
         self.voice_assistant = VoiceAssistant()
         self.voice_assistant.init_gui(self.app)
         
-        # Show GUI
+        # Connect permission manager to GUI
         if self.voice_assistant.gui:
+            self.voice_assistant.gui.set_permission_manager(permission_manager)
+            
+            # Show permissions tab first if any permissions are missing
+            missing_permissions = [k for k, v in permissions.items() if not v]
+            if missing_permissions:
+                logger.info(f"Missing permissions detected: {missing_permissions}")
+                logger.info("Showing permissions tab to guide user...")
+                # Set permissions tab as active
+                self.voice_assistant.gui.tab_widget.setCurrentIndex(1)  # Permissions is the second tab
+            
             self.voice_assistant.gui.show()
         
         # Start assistant

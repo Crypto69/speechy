@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>Speechy</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.chrisventer.speechy</string>
+    <key>CFBundleName</key>
+    <string>Speechy</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.15</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Speechy needs microphone access to record your voice for speech-to-text transcription and AI assistance.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Speechy needs to control other applications to enable auto-typing functionality and global hotkey support.</string>
+    <key>NSInputMonitoringUsageDescription</key>
+    <string>Speechy needs Input Monitoring access to detect global hotkeys (like F9) for hands-free voice recording control.</string>
+    <key>NSSystemAdministrationUsageDescription</key>
+    <string>Speechy needs system administration access for advanced input monitoring and accessibility features.</string>
+    <key>NSSupportsAutomaticTermination</key>
+    <true/>
+    <key>NSSupportsSuddenTermination</key>
+    <true/>
+</dict>
+</plist>

@@ -9,11 +9,250 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout
                             QWidget, QLabel, QPushButton, QTextEdit, QProgressBar,
                             QSystemTrayIcon, QMenu, QAction, QMessageBox, QFrame,
                             QComboBox, QCheckBox, QSpinBox, QGroupBox, QTabWidget,
-                            QSplitter)
+                            QSplitter, QGridLayout)
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, pyqtSlot, QObject
 from PyQt5.QtGui import QIcon, QFont, QPalette, QColor, QPixmap, QPainter
 
 logger = logging.getLogger(__name__)
+
+class PermissionStatusWidget(QWidget):
+    """Widget to display and manage macOS permission status."""
+    
+    def __init__(self):
+        super().__init__()
+        self.permission_manager = None
+        self.permission_labels = {}
+        self.permission_buttons = {}
+        self.init_ui()
+        
+    def init_ui(self):
+        """Initialize the permission status UI."""
+        layout = QVBoxLayout(self)
+        
+        # Title
+        title_label = QLabel("System Permissions")
+        title_label.setFont(QFont("Arial", 14, QFont.Bold))
+        layout.addWidget(title_label)
+        
+        # Permissions frame
+        permissions_frame = QFrame()
+        permissions_frame.setFrameStyle(QFrame.StyledPanel)
+        permissions_frame.setStyleSheet("""
+            QFrame {
+                border: 2px solid #555555;
+                border-radius: 12px;
+                padding: 10px;
+                background-color: #3a3a3a;
+            }
+        """)
+        
+        permissions_layout = QGridLayout(permissions_frame)
+        permissions_layout.setSpacing(15)
+        
+        # Permission definitions
+        permissions = [
+            {
+                'key': 'microphone',
+                'name': 'Microphone Access',
+                'description': 'Required for voice recording',
+                'icon': '🎤',
+                'settings_url': 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'
+            },
+            {
+                'key': 'accessibility',
+                'name': 'Accessibility',
+                'description': 'Required for auto-typing functionality',
+                'icon': '♿',
+                'settings_url': 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'
+            },
+            {
+                'key': 'input_monitoring',
+                'name': 'Input Monitoring',
+                'description': 'Required for global hotkeys (F9, etc.)',
+                'icon': '⌨️',
+                'settings_url': 'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent'
+            }
+        ]
+        
+        # Create permission rows
+        for i, perm in enumerate(permissions):
+            # Icon
+            icon_label = QLabel(perm['icon'])
+            icon_label.setFont(QFont("Arial", 20))
+            icon_label.setFixedSize(40, 40)
+            icon_label.setAlignment(Qt.AlignCenter)
+            permissions_layout.addWidget(icon_label, i, 0)
+            
+            # Name and description
+            name_label = QLabel(perm['name'])
+            name_label.setFont(QFont("Arial", 12, QFont.Bold))
+            permissions_layout.addWidget(name_label, i, 1)
+            
+            desc_label = QLabel(perm['description'])
+            desc_label.setFont(QFont("Arial", 10))
+            desc_label.setStyleSheet("color: #888888;")
+            permissions_layout.addWidget(desc_label, i, 2)
+            
+            # Status indicator
+            status_label = QLabel("❌ Unknown")
+            status_label.setFont(QFont("Arial", 11, QFont.Bold))
+            status_label.setFixedWidth(120)
+            self.permission_labels[perm['key']] = status_label
+            permissions_layout.addWidget(status_label, i, 3)
+            
+            # Settings button
+            settings_btn = QPushButton("Open Settings")
+            settings_btn.setProperty("class", "secondary")
+            settings_btn.setFixedWidth(100)
+            settings_btn.clicked.connect(
+                lambda checked, url=perm['settings_url']: self.open_system_settings(url)
+            )
+            self.permission_buttons[perm['key']] = settings_btn
+            permissions_layout.addWidget(settings_btn, i, 4)
+        
+        layout.addWidget(permissions_frame)
+        
+        # Control buttons
+        button_layout = QHBoxLayout()
+        
+        refresh_btn = QPushButton("🔄 Refresh Status")
+        refresh_btn.setProperty("class", "primary")
+        refresh_btn.clicked.connect(self.refresh_permissions)
+        button_layout.addWidget(refresh_btn)
+        
+        test_permissions_btn = QPushButton("🧪 Test All Permissions")
+        test_permissions_btn.setProperty("class", "secondary")
+        test_permissions_btn.clicked.connect(self.test_all_permissions)
+        button_layout.addWidget(test_permissions_btn)
+        
+        button_layout.addStretch()
+        
+        layout.addLayout(button_layout)
+        layout.addStretch()
+    
+    def set_permission_manager(self, permission_manager):
+        """Set the permission manager instance."""
+        self.permission_manager = permission_manager
+        self.refresh_permissions()
+    
+    def refresh_permissions(self):
+        """Refresh permission status display."""
+        if not self.permission_manager:
+            # Import here to avoid circular imports
+            from permission_manager import PermissionManager
+            self.permission_manager = PermissionManager()
+        
+        try:
+            # Check permissions
+            permissions = self.permission_manager.check_all_permissions()
+            
+            # Update UI
+            for perm_key, status in permissions.items():
+                if perm_key in self.permission_labels:
+                    label = self.permission_labels[perm_key]
+                    if status:
+                        label.setText("✅ Granted")
+                        label.setStyleSheet("color: #34C759; font-weight: bold;")
+                    else:
+                        label.setText("❌ Denied")
+                        label.setStyleSheet("color: #FF3B30; font-weight: bold;")
+                        
+        except Exception as e:
+            logger.error(f"Error refreshing permissions: {e}")
+            for label in self.permission_labels.values():
+                label.setText("❓ Error")
+                label.setStyleSheet("color: #FF9500; font-weight: bold;")
+    
+    def open_system_settings(self, url: str):
+        """Open System Settings to the specified panel."""
+        try:
+            import subprocess
+            subprocess.run(['open', url], check=False)
+        except Exception as e:
+            logger.error(f"Error opening system settings: {e}")
+    
+    def test_all_permissions(self):
+        """Test all permissions to verify they work."""
+        if not self.permission_manager:
+            return
+            
+        try:
+            # Test microphone
+            if self.permission_manager.permissions.get('microphone', False):
+                logger.info("Testing microphone access...")
+                self._test_microphone_safely()
+            
+            # Test accessibility
+            if self.permission_manager.permissions.get('accessibility', False):
+                logger.info("Testing accessibility access...")
+                self._test_accessibility_safely()
+            
+            # Test input monitoring
+            if self.permission_manager.permissions.get('input_monitoring', False):
+                logger.info("Testing input monitoring access...")
+                self._test_input_monitoring_safely()
+                
+            # Refresh status after tests
+            self.refresh_permissions()
+            
+        except Exception as e:
+            logger.error(f"Error testing permissions: {e}")
+    
+    def _test_microphone_safely(self):
+        """Safely test microphone access without crashing."""
+        try:
+            import pyaudio
+            audio = pyaudio.PyAudio()
+            try:
+                # Quick test stream
+                stream = audio.open(
+                    format=pyaudio.paInt16,
+                    channels=1,
+                    rate=16000,
+                    input=True,
+                    frames_per_buffer=512
+                )
+                # Read small amount
+                data = stream.read(512, exception_on_overflow=False)
+                stream.close()
+                logger.info(f"✅ Microphone test successful - read {len(data)} bytes")
+            finally:
+                audio.terminate()
+        except Exception as e:
+            logger.error(f"❌ Microphone test failed: {e}")
+    
+    def _test_accessibility_safely(self):
+        """Safely test accessibility access."""
+        try:
+            # Simple AppleScript test
+            script = '''
+            tell application "System Events"
+                try
+                    return "accessibility_test_ok"
+                on error
+                    return "accessibility_test_failed"
+                end try
+            end tell
+            '''
+            import subprocess
+            result = subprocess.run(['osascript', '-e', script], 
+                                  capture_output=True, text=True, check=False)
+            if "accessibility_test_ok" in result.stdout:
+                logger.info("✅ Accessibility test successful")
+            else:
+                logger.info("❌ Accessibility test failed")
+        except Exception as e:
+            logger.error(f"❌ Accessibility test failed: {e}")
+    
+    def _test_input_monitoring_safely(self):
+        """Safely test input monitoring access."""
+        try:
+            # Try to access event flags without creating problematic listeners
+            import Quartz
+            flags = Quartz.CGEventSourceFlagsState(Quartz.kCGEventSourceStateCombinedSessionState)
+            logger.info(f"✅ Input monitoring test successful - got flags: {flags}")
+        except Exception as e:
+            logger.error(f"❌ Input monitoring test failed: {e}")
 
 class RecordingIndicator(QWidget):
     """Custom widget to show recording status with animated indicator."""
@@ -124,6 +363,10 @@ class VoiceAssistantGUI(QMainWindow):
         self.generating = False
         self.model_loading = False
         
+        # Permission manager and status widget
+        self.permission_manager = None
+        self.permission_status_widget = None
+        
         # Callbacks
         self.toggle_recording_callback: Optional[Callable] = None
         
@@ -156,6 +399,9 @@ class VoiceAssistantGUI(QMainWindow):
         
         # Main tab
         self.create_main_tab()
+        
+        # Permissions tab (added first to be prominent)
+        self.create_permissions_tab()
         
         # Settings tab
         self.create_settings_tab()
@@ -270,6 +516,11 @@ class VoiceAssistantGUI(QMainWindow):
         layout.addWidget(self.progress_bar)
         
         self.tab_widget.addTab(main_widget, "Main")
+    
+    def create_permissions_tab(self):
+        """Create the permissions status tab."""
+        self.permission_status_widget = PermissionStatusWidget()
+        self.tab_widget.addTab(self.permission_status_widget, "🔐 Permissions")
         
     def create_settings_tab(self):
         """Create the settings tab."""
@@ -528,6 +779,11 @@ class VoiceAssistantGUI(QMainWindow):
                 QPushButton:pressed {
                     background-color: #3a3a3a;
                 }
+                QPushButton:disabled {
+                    background-color: #2a2a2a;
+                    color: #666666;
+                    border: 1px solid #3a3a3a;
+                }
                 /* Primary action buttons (blue) */
                 QPushButton[class="primary"] {
                     background-color: #007AFF;
@@ -540,6 +796,11 @@ class VoiceAssistantGUI(QMainWindow):
                 }
                 QPushButton[class="primary"]:pressed {
                     background-color: #003D99;
+                }
+                QPushButton[class="primary"]:disabled {
+                    background-color: #2a2a2a;
+                    color: #666666;
+                    border: 1px solid #3a3a3a;
                 }
                 /* Secondary action buttons (muted blue) */
                 QPushButton[class="secondary"] {
@@ -554,6 +815,11 @@ class VoiceAssistantGUI(QMainWindow):
                 QPushButton[class="secondary"]:pressed {
                     background-color: #2A3654;
                 }
+                QPushButton[class="secondary"]:disabled {
+                    background-color: #2a2a2a;
+                    color: #666666;
+                    border: 1px solid #3a3a3a;
+                }
                 /* Success/Active state buttons (green) */
                 QPushButton[class="success"] {
                     background-color: #34C759;
@@ -567,6 +833,11 @@ class VoiceAssistantGUI(QMainWindow):
                 }
                 QPushButton[class="success"]:pressed {
                     background-color: #1E7E34;
+                }
+                QPushButton[class="success"]:disabled {
+                    background-color: #2a2a2a;
+                    color: #666666;
+                    border: 1px solid #3a3a3a;
                 }
                 QComboBox {
                     background-color: #4a4a4a;
@@ -672,6 +943,12 @@ class VoiceAssistantGUI(QMainWindow):
     def set_callbacks(self, toggle_recording_cb: Callable):
         """Set callback function for recording control."""
         self.toggle_recording_callback = toggle_recording_cb
+    
+    def set_permission_manager(self, permission_manager):
+        """Set the permission manager for the permissions tab."""
+        self.permission_manager = permission_manager
+        if self.permission_status_widget:
+            self.permission_status_widget.set_permission_manager(permission_manager)
     
     def toggle_recording(self):
         """Toggle manual recording."""

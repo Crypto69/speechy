@@ -9,6 +9,8 @@ import time
 import os
 import tempfile
 import logging
+import platform
+import subprocess
 from typing import Optional, Callable, List
 
 logger = logging.getLogger(__name__)
@@ -44,9 +46,68 @@ class AudioHandler:
         # Audio level monitoring
         self.audio_level = 0.0
         self.level_callback: Optional[Callable[[float], None]] = None
+        self._microphone_permission_checked = False
         
-        # Validate audio device
+        # Validate audio device (permission check happens on first recording)
         self._validate_device()
+        
+    def _check_microphone_permissions(self) -> None:
+        """Check and request microphone permissions on macOS."""
+        if platform.system() != "Darwin" or self._microphone_permission_checked:
+            return
+            
+        try:
+            # Try to create a test audio stream to trigger permission request
+            logger.info("Checking microphone permissions...")
+            test_stream = self.audio.open(
+                format=self.format_type,
+                channels=self.channels,
+                rate=self.sample_rate,
+                input=True,
+                input_device_index=self.device_index,
+                frames_per_buffer=self.chunk_size
+            )
+            # Read a small amount of data to ensure permission is granted
+            test_stream.read(self.chunk_size, exception_on_overflow=False)
+            test_stream.stop_stream()
+            test_stream.close()
+            logger.info("Microphone permission granted")
+            self._microphone_permission_checked = True
+            
+        except Exception as e:
+            logger.error(f"Microphone permission check failed: {e}")
+            # Show user a helpful message about permissions
+            self._show_permission_error()
+            raise RuntimeError("Microphone access denied. Please grant microphone permission in System Preferences > Security & Privacy > Privacy > Microphone")
+    
+    def _show_permission_error(self) -> None:
+        """Show permission error dialog on macOS."""
+        if platform.system() != "Darwin":
+            return
+            
+        try:
+            # Use osascript to show a dialog
+            script = '''
+            tell application "System Events"
+                display dialog "Speechy needs microphone access to function properly.
+
+Please:
+1. Open System Settings (or System Preferences)
+2. Go to Privacy & Security
+3. Select Microphone from the list
+4. Enable the toggle next to Speechy
+5. Try recording again
+
+The app will now open System Settings for you." buttons {"Open System Settings", "Cancel"} default button "Open System Settings" with icon caution
+                
+                if button returned of result is "Open System Settings" then
+                    do shell script "open x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+                end if
+            end tell
+            '''
+            subprocess.run(['osascript', '-e', script], check=False)
+        except Exception as e:
+            logger.error(f"Could not show permission dialog: {e}")
         
     def _validate_device(self) -> None:
         """Validate the audio device configuration."""
@@ -168,6 +229,13 @@ class AudioHandler:
         """
         if self.recording:
             logger.warning("Recording already in progress")
+            return False
+        
+        # Check microphone permissions when recording is first attempted
+        try:
+            self._check_microphone_permissions()
+        except RuntimeError as e:
+            logger.error(f"Microphone permission denied: {e}")
             return False
         
         try:

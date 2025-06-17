@@ -55,11 +55,31 @@ for i in range(p.get_device_count()):
 pip install pyobjc-framework-Cocoa pyobjc-framework-AVFoundation pyobjc-framework-Quartz pyobjc-framework-Foundation pyobjc-framework-ApplicationServices
 ```
 
-**Build Executable:**
+**Build Executable (Automated - Recommended):**
+```bash
+# Automated build with code signing and verification
+./build_app.sh
+```
+
+**Build Executable (Manual):**
 ```bash
 pip install pyinstaller
 # Use the configured spec file (includes Info.plist and entitlements for permissions)
 pyinstaller speechy.spec
+
+# Manual code signing (required for permissions to work)
+codesign --deep --force --verify --verbose \
+    --sign "Developer ID Application: Christian Venter (4R94388LH8)" \
+    --options runtime \
+    --entitlements voice-assistant/entitlements.plist \
+    dist/Speechy.app
+```
+
+**Alternative Build Method (py2app):**
+```bash
+pip install py2app
+python setup.py py2app
+# Then sign with codesign as above
 ```
 
 **macOS Permissions:**
@@ -73,14 +93,36 @@ The app requires three permissions on macOS:
 - Real-time permission checking with ✅/❌ status display
 - Direct links to System Settings for each permission type
 - Automatic permission request on first launch using proper macOS APIs
-- Built with proper entitlements file for microphone access
+- Built with proper entitlements file and code signing for microphone access
+- Enhanced debugging with environment and bundle information logging
+
+**Permission Testing & Debugging:**
+```bash
+# Reset all permissions for fresh testing
+./reset_permissions.sh
+
+# Check what certificates are available
+security find-identity -p codesigning
+
+# Monitor permission requests in real-time
+log show --predicate 'subsystem == "com.apple.TCC"' --last 5m
+
+# Check Console.app for permission-related errors
+# Filter for "Speechy" or "tccd"
+```
 
 **First Launch:**
 1. App will automatically request Input Monitoring permission (approve this)
-2. App will show Permissions tab if any permissions are missing
+2. App will show Permissions tab if any permissions are missing  
 3. Use "Open Settings" buttons to grant remaining permissions
 4. Use "Refresh Status" to update permission display
 5. All permissions should show ✅ when properly granted
+
+**Troubleshooting Permissions:**
+- **Built app won't request permissions**: Ensure app is properly code signed with entitlements
+- **Development vs Built differences**: Check bundle ID and signing status
+- **Permission dialog doesn't appear**: Check Console.app for TCC errors
+- **Reset for testing**: Use `./reset_permissions.sh` script
 
 ## Architecture Overview
 
@@ -103,6 +145,7 @@ The application follows an event-driven architecture with these key components:
 - **`OllamaClient`** (llm_client.py): HTTP client for Ollama API with model management and error handling
 - **`AutoTyper`** (auto_typer.py): Automatic typing at cursor position with app exclusions and customizable delays
 - **`VoiceAssistantGUI`** (gui.py): PyQt5 interface with system tray, tabbed interface, visual recording indicators, and custom about dialog
+- **`PermissionManager`** (permission_manager.py): Comprehensive macOS permission checking and requesting with multiple detection methods and detailed logging
 - **`Config`** (config.py): JSON-based configuration management with runtime updates
 
 **Threading Model:**
@@ -161,8 +204,10 @@ The application follows an event-driven architecture with these key components:
 ## Platform-Specific Notes
 
 **macOS:**
-- Requires accessibility permissions for global hotkeys
+- Requires three permissions: Microphone, Accessibility, Input Monitoring
 - PyAudio dependency: `brew install portaudio`
+- Code signing required for permission dialogs to work properly
+- Uses AVFoundation, ApplicationServices, and Quartz frameworks for permission checking
 
 **Linux:**
 - May need sudo for global hotkey access
@@ -171,3 +216,23 @@ The application follows an event-driven architecture with these key components:
 **Windows:**
 - May need administrator privileges for hotkeys
 - PyAudio installation sometimes requires pipwin
+
+## Build System Files
+
+**Core Build Files:**
+- `speechy.spec` - PyInstaller configuration with hidden imports and bundle settings
+- `build_app.sh` - Automated build script with code signing and verification
+- `setup.py` - Alternative py2app build configuration
+- `voice-assistant/entitlements.plist` - Security entitlements for code signing
+- `voice-assistant/Info.plist` - App bundle metadata and permission usage descriptions
+
+**Testing & Debugging:**
+- `reset_permissions.sh` - Reset app permissions for testing
+- `PERMISSION_MANAGEMENT_SUMMARY.md` - Comprehensive permission system documentation
+
+**Key Build Features:**
+- Automatic Developer ID certificate detection
+- Fallback to ad-hoc signing for development
+- Entitlements integration for macOS permissions
+- Bundle verification and signature checking
+- Optional DMG creation for distribution

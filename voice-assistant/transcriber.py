@@ -29,7 +29,8 @@ class WhisperTranscriber:
     """Handles speech-to-text transcription using Whisper model."""
     
     def __init__(self, model_size: str = "base", device: str = "auto", 
-                 compute_type: str = "auto", progress_callback: Optional[Callable[[int, str], None]] = None):
+                 compute_type: str = "auto", progress_callback: Optional[Callable[[int, str], None]] = None,
+                 config = None):
         """Initialize the Whisper transcriber.
         
         Args:
@@ -37,11 +38,13 @@ class WhisperTranscriber:
             device: Device to run on ("cpu", "cuda", "auto")
             compute_type: Compute type ("int8", "float16", "float32", "auto")
             progress_callback: Optional callback for progress updates (progress_percent, status_message)
+            config: Configuration object for accessing settings
         """
         self.model_size = model_size
         self.device = device
         self.compute_type = compute_type
         self.model: Optional[WhisperModel] = None
+        self.config = config
         self.model_loaded = False
         self.loading = False
         self.progress_callback = progress_callback
@@ -333,6 +336,13 @@ class WhisperTranscriber:
                     
                     if silence_ratio > 0.8:
                         logger.warning("Audio appears to be mostly silent")
+                    
+                    # Pre-filter: Skip Whisper processing for very quiet audio
+                    silence_skip_threshold = self.config.get("silence_skip_threshold", 50) if self.config else 50
+                    if max_amplitude < silence_skip_threshold and silence_ratio > 0.95:
+                        logger.info(f"Skipping Whisper processing: max_amplitude={max_amplitude} < {silence_skip_threshold} and silence_ratio={silence_ratio:.1%} > 95%")
+                        logger.info("No voice input detected")
+                        return "NO_VOICE_INPUT"
                         
             except Exception as wave_e:
                 logger.warning(f"Could not read audio file properties: {wave_e}")
@@ -358,13 +368,22 @@ class WhisperTranscriber:
             
             logger.info(f"Whisper detected language: {info.language} (confidence: {info.language_probability:.2f})")
             
-            # Combine all segments into a single text
+            # Filter segments by confidence threshold and combine into text
+            confidence_threshold = self.config.get_confidence_threshold() if self.config else -0.5
             transcribed_text = ""
             segment_count = 0
+            filtered_count = 0
             for segment in segments:
                 logger.debug(f"Segment {segment_count}: '{segment.text}' (confidence: {segment.avg_logprob:.2f})")
-                transcribed_text += segment.text
+                if segment.avg_logprob >= confidence_threshold:
+                    transcribed_text += segment.text
+                else:
+                    logger.debug(f"Filtered segment {segment_count} due to low confidence: {segment.avg_logprob:.2f} < {confidence_threshold}")
+                    filtered_count += 1
                 segment_count += 1
+            
+            if filtered_count > 0:
+                logger.info(f"Filtered {filtered_count}/{segment_count} segments due to low confidence (threshold: {confidence_threshold})")
             
             logger.info(f"Total segments processed: {segment_count}")
             
@@ -378,10 +397,10 @@ class WhisperTranscriber:
             if transcribed_text:
                 logger.info(f"Transcription completed in {duration:.2f}s: '{transcribed_text[:100]}{'...' if len(transcribed_text) > 100 else ''}'")
                 logger.info(f"Detected language: {info.language} (confidence: {info.language_probability:.2f})")
+                return transcribed_text
             else:
-                logger.warning("No speech detected in audio")
-                
-            return transcribed_text if transcribed_text else None
+                logger.info("No voice input detected")
+                return "NO_VOICE_INPUT"
             
         except Exception as e:
             logger.error(f"Transcription failed: {e}")

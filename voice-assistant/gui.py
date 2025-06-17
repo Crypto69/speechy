@@ -8,7 +8,7 @@ from typing import Optional, Callable
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
                             QWidget, QLabel, QPushButton, QTextEdit, QProgressBar,
                             QSystemTrayIcon, QMenu, QAction, QMessageBox, QFrame,
-                            QComboBox, QCheckBox, QSpinBox, QGroupBox, QTabWidget,
+                            QComboBox, QCheckBox, QSpinBox, QDoubleSpinBox, QGroupBox, QTabWidget,
                             QSplitter, QGridLayout)
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, pyqtSlot, QObject
 from PyQt5.QtGui import QIcon, QFont, QPalette, QColor, QPixmap, QPainter
@@ -541,6 +541,19 @@ class VoiceAssistantGUI(QMainWindow):
         hotkey_layout.addWidget(self.hotkey_combo)
         hotkey_layout.addStretch()
         audio_layout.addLayout(hotkey_layout)
+        
+        # Confidence threshold
+        confidence_layout = QHBoxLayout()
+        confidence_layout.addWidget(QLabel("Confidence Threshold:"))
+        self.confidence_spinbox = QDoubleSpinBox()
+        self.confidence_spinbox.setRange(-2.0, 0.0)
+        self.confidence_spinbox.setSingleStep(0.1)
+        self.confidence_spinbox.setDecimals(1)
+        self.confidence_spinbox.setValue(self.config.get_confidence_threshold())
+        self.confidence_spinbox.setToolTip("Minimum confidence for accepting transcriptions (-0.5 recommended)")
+        confidence_layout.addWidget(self.confidence_spinbox)
+        confidence_layout.addStretch()
+        audio_layout.addLayout(confidence_layout)
         
         # Audio device selection would go here (requires pyaudio device enumeration)
         
@@ -1117,6 +1130,7 @@ class VoiceAssistantGUI(QMainWindow):
         """Save settings from GUI to config."""
         # Update config with GUI values
         self.config.set("hotkey", self.hotkey_combo.currentText())
+        self.config.set("confidence_threshold", self.confidence_spinbox.value())
         self.config.set("whisper_model", self.whisper_combo.currentText())
         self.config.set("ollama_model", self.ollama_combo.currentText())
         self.config.set("log_transcriptions", self.log_transcriptions_cb.isChecked())

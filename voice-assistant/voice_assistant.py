@@ -75,7 +75,8 @@ class VoiceAssistant(QObject):
             # Initialize transcriber with progress callback
             self.transcriber = WhisperTranscriber(
                 model_size=self.config.get_whisper_model(),
-                progress_callback=self.on_model_loading_progress
+                progress_callback=self.on_model_loading_progress,
+                config=self.config
             )
             logger.info("Transcriber initialized")
             

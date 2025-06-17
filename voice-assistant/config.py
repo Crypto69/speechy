@@ -28,7 +28,9 @@ class Config:
         "auto_typing_delay": 1.0,
         "auto_typing_speed": 0.02,
         "auto_typing_mode": "raw",  # "raw", "corrected", or "both"
-        "auto_typing_excluded_apps": ["Keychain Access", "Login Window", "1Password"]
+        "auto_typing_excluded_apps": ["Keychain Access", "Login Window", "1Password"],
+        "confidence_threshold": -0.5,  # Minimum confidence for accepting transcriptions
+        "silence_skip_threshold": 50  # Skip Whisper processing if max amplitude below this value
     }
     
     def __init__(self, config_file: str = "config.json"):
@@ -171,3 +173,7 @@ class Config:
     def get_auto_typing_excluded_apps(self) -> list:
         """Get list of excluded applications for auto-typing."""
         return self.config.get("auto_typing_excluded_apps", ["Keychain Access", "Login Window", "1Password"])
+    
+    def get_confidence_threshold(self) -> float:
+        """Get confidence threshold for accepting transcriptions."""
+        return self.config.get("confidence_threshold", -0.5)

@@ -57,7 +57,10 @@ class AudioProcessor(QObject):
                 # Step 1: Transcribe audio
                 transcription = self._transcribe_audio(audio_file_path)
                 
-                if transcription:
+                if transcription == "NO_VOICE_INPUT":
+                    # Handle silence detection
+                    self.status_message_signal.emit("No voice input detected")
+                elif transcription:
                     # Step 2: Handle transcription results
                     self._handle_transcription(transcription)
                     

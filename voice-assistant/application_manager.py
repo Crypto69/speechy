@@ -31,6 +31,7 @@ class ApplicationManager:
                 logging.StreamHandler()
             ]
         )
+        logger.info("🎤 Speechy - Your AI Voice Assistant")
         logger.info("Logging configured")
     
     def _get_logs_dir(self):

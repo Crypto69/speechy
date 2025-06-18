@@ -20,6 +20,28 @@ ollama serve
 python main.py
 ```
 
+## ⚠️ CRITICAL: Hotkey Stability Information
+
+**WORKING BASELINE: Commit 851bb1d**
+- ✅ Global hotkeys (F9) work perfectly 
+- ✅ All functionality confirmed working: recording, transcription, auto-typing, LLM processing
+- ✅ All macOS permissions properly detected and working
+- 🔒 This commit is the STABLE BASELINE - never modify without testing hotkeys
+
+**Known Hotkey Breaking Patterns:**
+- ⚠️ Timing measurements (`time.time()`) during component initialization interfere with pynput
+- ⚠️ Splash screen implementations can cause startup timing issues
+- ⚠️ Any changes to application startup sequence must be tested for hotkey compatibility
+
+**Testing Hotkeys After Changes:**
+1. Run application: `python main.py` 
+2. Wait for "Hotkey listener started for: f9" log message
+3. Press F9 to start recording (should see "Hotkey activated: f9" in logs)
+4. Speak some test words
+5. Press F9 again to stop recording
+6. Verify transcription appears and auto-typing works
+7. ❌ If hotkeys don't work, immediately revert changes
+
 ## Essential Commands
 
 **Run Application:**

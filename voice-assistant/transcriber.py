@@ -145,7 +145,7 @@ class WhisperTranscriber:
         
         try:
             self.loading = True
-            logger.info(f"Loading Whisper model: {self.model_size}")
+            logger.info(f"🤖 Loading Whisper model: {self.model_size}")
             
             # Start with progress tracking
             model_size_mb = self._get_model_size_mb()

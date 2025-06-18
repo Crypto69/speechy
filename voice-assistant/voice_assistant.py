@@ -60,8 +60,10 @@ class VoiceAssistant(QObject):
     def init_components(self):
         """Initialize all components."""
         try:
+            logger.info("🔧 Starting component initialization")
             # Initialize notification manager first
             self.notification_manager = NotificationManager()
+            logger.info("NotificationManager initialized")
             
             # Initialize audio handler
             self.audio_handler = AudioHandler(

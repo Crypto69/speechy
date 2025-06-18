@@ -1,8 +1,6 @@
 """Audio recording and processing functionality for the voice assistant."""
 
-import pyaudio
 import wave
-import numpy as np
 import threading
 import queue
 import time
@@ -15,11 +13,31 @@ from typing import Optional, Callable, List
 
 logger = logging.getLogger(__name__)
 
+# Lazy imports for better startup performance
+_pyaudio = None
+_numpy = None
+
+def get_pyaudio():
+    """Lazy import PyAudio when needed."""
+    global _pyaudio
+    if _pyaudio is None:
+        import pyaudio
+        _pyaudio = pyaudio
+    return _pyaudio
+
+def get_numpy():
+    """Lazy import numpy when needed.""" 
+    global _numpy
+    if _numpy is None:
+        import numpy as np
+        _numpy = np
+    return _numpy
+
 class AudioHandler:
     """Handles audio recording from microphone with real-time processing."""
     
     def __init__(self, sample_rate: int = 16000, chunk_size: int = 1024, 
-                 channels: int = 1, format_type: int = pyaudio.paInt16,
+                 channels: int = 1, format_type: Optional[int] = None,
                  device_index: Optional[int] = None):
         """Initialize audio handler.
         
@@ -33,11 +51,11 @@ class AudioHandler:
         self.sample_rate = sample_rate
         self.chunk_size = chunk_size
         self.channels = channels
-        self.format_type = format_type
+        self.format_type = format_type if format_type is not None else get_pyaudio().paInt16
         self.device_index = device_index
         
-        self.audio = pyaudio.PyAudio()
-        self.stream: Optional[pyaudio.Stream] = None
+        self.audio = None  # Will be initialized when first needed
+        self.stream = None
         self.recording = False
         self.audio_queue = queue.Queue()
         self.audio_data: List[bytes] = []
@@ -48,8 +66,14 @@ class AudioHandler:
         self.level_callback: Optional[Callable[[float], None]] = None
         self._microphone_permission_checked = False
         
-        # Validate audio device (permission check happens on first recording)
-        self._validate_device()
+        logger.info("AudioHandler created - PyAudio will be initialized on first use")
+        
+    def _ensure_pyaudio_initialized(self):
+        """Initialize PyAudio if not already done."""
+        if self.audio is None:
+            pyaudio = get_pyaudio()
+            self.audio = pyaudio.PyAudio()
+            logger.info("PyAudio initialized")
         
     def _check_microphone_permissions(self) -> None:
         """Check and request microphone permissions on macOS."""
@@ -57,6 +81,9 @@ class AudioHandler:
             return
             
         try:
+            # Ensure PyAudio is initialized
+            self._ensure_pyaudio_initialized()
+            
             # Try to create a test audio stream to trigger permission request
             logger.info("Checking microphone permissions...")
             test_stream = self.audio.open(
@@ -112,6 +139,7 @@ The app will now open System Settings for you." buttons {"Open System Settings",
     def _validate_device(self) -> None:
         """Validate the audio device configuration."""
         try:
+            self._ensure_pyaudio_initialized()
             if self.device_index is not None:
                 device_info = self.audio.get_device_info_by_index(self.device_index)
                 logger.info(f"Using audio device: {device_info['name']}")
@@ -128,6 +156,7 @@ The app will now open System Settings for you." buttons {"Open System Settings",
         Returns:
             List of device information dictionaries
         """
+        self._ensure_pyaudio_initialized()
         devices = []
         for i in range(self.audio.get_device_count()):
             try:
@@ -161,6 +190,9 @@ The app will now open System Settings for you." buttons {"Open System Settings",
             Audio level between 0.0 and 1.0
         """
         try:
+            # Get numpy via lazy import
+            np = get_numpy()
+            
             # Convert bytes to numpy array
             audio_array = np.frombuffer(audio_data, dtype=np.int16)
             

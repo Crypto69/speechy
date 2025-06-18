@@ -4,6 +4,7 @@ import os
 import logging
 import threading
 import time
+import numpy as np
 from typing import Optional, Callable, Dict
 from faster_whisper import WhisperModel
 
@@ -246,7 +247,6 @@ class WhisperTranscriber:
             try:
                 self._update_progress(98, "Validating model...")
                 # Create a small test audio array (1 second of silence)
-                import numpy as np
                 test_audio = np.zeros(16000, dtype=np.float32)  # 1 second of silence at 16kHz
                 segments, info = self.model.transcribe(test_audio, beam_size=1)
                 list(segments)  # Force evaluation
@@ -303,7 +303,6 @@ class WhisperTranscriber:
             # Try to get more info about the audio file
             try:
                 import wave
-                import numpy as np
                 with wave.open(audio_file_path, 'rb') as wf:
                     frames = wf.getnframes()
                     sample_rate = wf.getframerate()

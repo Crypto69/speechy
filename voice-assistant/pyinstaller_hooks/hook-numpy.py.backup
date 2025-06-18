@@ -1,0 +1,28 @@
+"""PyInstaller hook for numpy to fix docstring issues."""
+
+from PyInstaller.utils.hooks import collect_all, collect_submodules
+
+# Collect all numpy modules and data
+datas, binaries, hiddenimports = collect_all('numpy')
+
+# Add specific hidden imports that are commonly missing
+hiddenimports += [
+    'numpy.core._multiarray_umath',
+    'numpy.core._multiarray_tests',
+    'numpy.linalg._umath_linalg',
+    'numpy.fft._pocketfft_internal',
+    'numpy.random._common',
+    'numpy.random._bounded_integers',
+    'numpy.random._mt19937',
+    'numpy.random._pcg64',
+    'numpy.random._philox',
+    'numpy.random._sfc64',
+    'numpy.random.bit_generator',
+    'numpy.random.mtrand',
+]
+
+# Collect all submodules to ensure completeness
+hiddenimports += collect_submodules('numpy')
+
+# Remove duplicates
+hiddenimports = list(set(hiddenimports))

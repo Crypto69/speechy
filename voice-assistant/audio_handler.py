@@ -9,13 +9,13 @@ import tempfile
 import logging
 import platform
 import subprocess
+import numpy as np
 from typing import Optional, Callable, List
 
 logger = logging.getLogger(__name__)
 
-# Lazy imports for better startup performance
+# Lazy import for PyAudio only (numpy must be imported directly for PyInstaller)
 _pyaudio = None
-_numpy = None
 
 def get_pyaudio():
     """Lazy import PyAudio when needed."""
@@ -24,14 +24,6 @@ def get_pyaudio():
         import pyaudio
         _pyaudio = pyaudio
     return _pyaudio
-
-def get_numpy():
-    """Lazy import numpy when needed.""" 
-    global _numpy
-    if _numpy is None:
-        import numpy as np
-        _numpy = np
-    return _numpy
 
 class AudioHandler:
     """Handles audio recording from microphone with real-time processing."""
@@ -190,9 +182,6 @@ The app will now open System Settings for you." buttons {"Open System Settings",
             Audio level between 0.0 and 1.0
         """
         try:
-            # Get numpy via lazy import
-            np = get_numpy()
-            
             # Convert bytes to numpy array
             audio_array = np.frombuffer(audio_data, dtype=np.int16)
             

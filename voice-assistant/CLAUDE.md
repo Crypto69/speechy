@@ -30,8 +30,9 @@ python main.py
 
 **Known Hotkey Breaking Patterns:**
 - ⚠️ Timing measurements (`time.time()`) during component initialization interfere with pynput
-- ⚠️ Splash screen implementations can cause startup timing issues
+- ❌ Splash screen implementations CONFIRMED to break hotkeys (QSplashScreen causes Qt event loop interference)
 - ⚠️ Any changes to application startup sequence must be tested for hotkey compatibility
+- ⚠️ GUI components shown before hotkey manager initialization can cause timing conflicts
 
 **Testing Hotkeys After Changes:**
 1. Run application: `python main.py` 

@@ -68,7 +68,7 @@ class PermissionStatusWidget(QWidget):
             {
                 'key': 'input_monitoring',
                 'name': 'Input Monitoring',
-                'description': 'Required for global hotkeys (F9, etc.)',
+                'description': 'Required for global hotkeys (F9, ⌥+Space, etc.)',
                 'icon': '⌨️',
                 'settings_url': 'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent'
             }
@@ -535,7 +535,7 @@ class VoiceAssistantGUI(QMainWindow):
         hotkey_layout = QHBoxLayout()
         hotkey_layout.addWidget(QLabel("Hotkey:"))
         self.hotkey_combo = QComboBox()
-        self.hotkey_combo.addItems(['f9', 'f10', 'f11', 'f12', 'ctrl+space', 'alt+space'])
+        self.hotkey_combo.addItems(['f9', 'f10', 'f11', 'f12', 'ctrl+space', 'alt+space', 'option+space'])
         self.hotkey_combo.setMinimumWidth(150)
         self.hotkey_combo.setCurrentText(self.config.get_hotkey())
         hotkey_layout.addWidget(self.hotkey_combo)

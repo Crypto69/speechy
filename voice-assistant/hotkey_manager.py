@@ -30,6 +30,9 @@ class HotkeyManager(QObject):
             self.hotkey_combo = {keyboard.Key.ctrl_l, keyboard.Key.space}
         elif self.hotkey_string.lower() == 'alt+space':
             self.hotkey_combo = {keyboard.Key.alt_l, keyboard.Key.space}
+        elif self.hotkey_string.lower() in ['option+space', 'opt+space']:
+            # Option key is alt_l on macOS
+            self.hotkey_combo = {keyboard.Key.alt_l, keyboard.Key.space}
         else:
             # Default to F9
             self.hotkey_combo = {keyboard.Key.f9}

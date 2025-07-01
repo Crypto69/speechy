@@ -93,8 +93,8 @@ class VoiceAssistant(QObject):
             self.hotkey_manager = HotkeyManager(self.config.get_hotkey())
             self.hotkey_manager.hotkey_toggled.connect(self.toggle_recording)
             
-            # Initialize auto-typer
-            self.auto_typer = AutoTyper()
+            # Initialize auto-typer with hotkey manager reference
+            self.auto_typer = AutoTyper(hotkey_manager=self.hotkey_manager)
             self.auto_typer.set_enabled(self.config.is_auto_typing_enabled())
             self.auto_typer.set_typing_delay(self.config.get_auto_typing_delay())
             self.auto_typer.set_typing_speed(self.config.get_auto_typing_speed())
@@ -291,10 +291,19 @@ class VoiceAssistant(QObject):
     def on_settings_changed(self, new_settings: dict):
         """Handle settings changes from GUI."""
         try:
-            # Update hotkey if changed
+            # Get old hotkey from signal data (passed from GUI)
+            old_hotkey = new_settings.get('_old_hotkey')
             new_hotkey = new_settings.get('hotkey')
-            if new_hotkey != self.config.get_hotkey() and self.hotkey_manager:
-                self.hotkey_manager.update_hotkey(new_hotkey)
+            
+            # Update hotkey if changed
+            if new_hotkey and old_hotkey and new_hotkey != old_hotkey and self.hotkey_manager:
+                try:
+                    logger.info(f"Updating hotkey from '{old_hotkey}' to '{new_hotkey}'")
+                    self.hotkey_manager.update_hotkey(new_hotkey)
+                    logger.info(f"Hotkey successfully updated to '{new_hotkey}'")
+                except Exception as e:
+                    logger.error(f"Error updating hotkey: {e}")
+                    logger.exception("Hotkey update failed with exception:")
             
             # Update other components if needed
             if new_settings.get('whisper_model') != self.config.get_whisper_model():

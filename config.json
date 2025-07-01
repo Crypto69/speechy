@@ -20,5 +20,9 @@
         "Keychain Access",
         "Login Window",
         "1Password"
-    ]
+    ],
+    "confidence_threshold": -0.4,
+    "silence_skip_threshold": 50,
+    "start_at_login": false,
+    "start_minimized": true
 }

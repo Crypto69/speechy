@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout
                             QSplitter, QGridLayout)
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, pyqtSlot, QObject
 from PyQt5.QtGui import QIcon, QFont, QPalette, QColor, QPixmap, QPainter
+from startup_manager import StartupManager
 
 logger = logging.getLogger(__name__)
 
@@ -367,6 +368,9 @@ class VoiceAssistantGUI(QMainWindow):
         self.permission_manager = None
         self.permission_status_widget = None
         
+        # Startup manager
+        self.startup_manager = StartupManager()
+        
         # Callbacks
         self.toggle_recording_callback: Optional[Callable] = None
         
@@ -377,6 +381,9 @@ class VoiceAssistantGUI(QMainWindow):
         # Connect signals for thread-safe model updates
         self.models_updated.connect(self._on_models_updated)
         self.models_loading.connect(self._on_models_loading)
+        
+        # Update startup status after UI is initialized
+        self.update_startup_status()
         
     def init_ui(self):
         """Initialize the user interface."""
@@ -621,6 +628,31 @@ class VoiceAssistantGUI(QMainWindow):
         features_layout.addWidget(self.clipboard_cb)
         
         layout.addWidget(features_group)
+        
+        # Startup settings
+        startup_group = QGroupBox("Startup")
+        startup_layout = QVBoxLayout(startup_group)
+        
+        self.start_at_login_cb = QCheckBox("Start Speechy at login")
+        self.start_at_login_cb.setChecked(self.config.should_start_at_login())
+        self.start_at_login_cb.setToolTip("Automatically start Speechy when you log into macOS")
+        startup_layout.addWidget(self.start_at_login_cb)
+        
+        self.start_minimized_cb = QCheckBox("Start minimized to system tray")
+        self.start_minimized_cb.setChecked(self.config.should_start_minimized())
+        self.start_minimized_cb.setToolTip("Start in the background without showing the main window")
+        startup_layout.addWidget(self.start_minimized_cb)
+        
+        # Startup status indicator
+        startup_status_layout = QHBoxLayout()
+        startup_status_layout.addWidget(QLabel("Current status:"))
+        self.startup_status_label = QLabel("❌ Not configured")
+        self.startup_status_label.setStyleSheet("font-weight: bold;")
+        startup_status_layout.addWidget(self.startup_status_label)
+        startup_status_layout.addStretch()
+        startup_layout.addLayout(startup_status_layout)
+        
+        layout.addWidget(startup_group)
         
         # Auto-typing settings
         auto_typing_group = QGroupBox("Auto-Typing")
@@ -1128,6 +1160,9 @@ class VoiceAssistantGUI(QMainWindow):
     
     def save_settings(self):
         """Save settings from GUI to config."""
+        # Store old values before updating config for change detection
+        old_hotkey = self.config.get_hotkey()
+        
         # Update config with GUI values
         self.config.set("hotkey", self.hotkey_combo.currentText())
         self.config.set("confidence_threshold", self.confidence_spinbox.value())
@@ -1136,6 +1171,17 @@ class VoiceAssistantGUI(QMainWindow):
         self.config.set("log_transcriptions", self.log_transcriptions_cb.isChecked())
         self.config.set("notification_enabled", self.notifications_cb.isChecked())
         self.config.set("copy_to_clipboard", self.clipboard_cb.isChecked())
+        
+        # Update startup settings
+        old_start_at_login = self.config.should_start_at_login()
+        new_start_at_login = self.start_at_login_cb.isChecked()
+        
+        self.config.set("start_at_login", new_start_at_login)
+        self.config.set("start_minimized", self.start_minimized_cb.isChecked())
+        
+        # Handle startup at login changes
+        if old_start_at_login != new_start_at_login:
+            self.handle_startup_setting_change(new_start_at_login)
         
         # Update hotkey label
         self.hotkey_label.setText(f"Hotkey: {self.config.get_hotkey().upper()} (Press once to start/stop)")
@@ -1150,8 +1196,10 @@ class VoiceAssistantGUI(QMainWindow):
         self.auto_typing_button.setChecked(self.auto_typing_enabled_cb.isChecked())
         self.update_auto_typing_button()
         
-        # Emit settings changed signal
-        self.settings_changed.emit(self.config.config)
+        # Emit settings changed signal with old hotkey for comparison
+        settings_data = self.config.config.copy()
+        settings_data['_old_hotkey'] = old_hotkey  # Add old hotkey for change detection
+        self.settings_changed.emit(settings_data)
         
         self.statusBar().showMessage("Settings saved", 2000)
     
@@ -1483,3 +1531,57 @@ class VoiceAssistantGUI(QMainWindow):
         """Refresh the Ollama models list."""
         self._populate_ollama_models_async()
         self.statusBar().showMessage("Refreshing Ollama models...", 1000)
+    
+    def update_startup_status(self):
+        """Update the startup status label based on actual LaunchAgent status."""
+        try:
+            if self.startup_manager and self.startup_manager.is_startup_enabled():
+                self.startup_status_label.setText("✅ Enabled")
+                self.startup_status_label.setStyleSheet("color: #34C759; font-weight: bold;")
+            else:
+                self.startup_status_label.setText("❌ Not configured")
+                self.startup_status_label.setStyleSheet("color: #FF3B30; font-weight: bold;")
+        except Exception as e:
+            logger.error(f"Error updating startup status: {e}")
+            self.startup_status_label.setText("❓ Unknown")
+            self.startup_status_label.setStyleSheet("color: #FF9500; font-weight: bold;")
+    
+    def handle_startup_setting_change(self, enable_startup: bool):
+        """Handle changes to the startup at login setting.
+        
+        Args:
+            enable_startup: True to enable startup, False to disable
+        """
+        try:
+            if enable_startup:
+                success = self.startup_manager.enable_startup()
+                if success:
+                    self.statusBar().showMessage("Startup at login enabled", 3000)
+                    logger.info("Startup at login enabled successfully")
+                else:
+                    self.statusBar().showMessage("Failed to enable startup at login", 3000)
+                    logger.error("Failed to enable startup at login")
+                    # Revert checkbox state
+                    self.start_at_login_cb.setChecked(False)
+                    self.config.set("start_at_login", False)
+            else:
+                success = self.startup_manager.disable_startup()
+                if success:
+                    self.statusBar().showMessage("Startup at login disabled", 3000)
+                    logger.info("Startup at login disabled successfully")
+                else:
+                    self.statusBar().showMessage("Failed to disable startup at login", 3000)
+                    logger.error("Failed to disable startup at login")
+                    # Revert checkbox state
+                    self.start_at_login_cb.setChecked(True)
+                    self.config.set("start_at_login", True)
+            
+            # Update status label
+            self.update_startup_status()
+            
+        except Exception as e:
+            logger.error(f"Error handling startup setting change: {e}")
+            self.statusBar().showMessage(f"Error configuring startup: {e}", 3000)
+            # Revert checkbox state
+            self.start_at_login_cb.setChecked(not enable_startup)
+            self.config.set("start_at_login", not enable_startup)

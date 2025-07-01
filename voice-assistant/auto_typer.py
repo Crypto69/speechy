@@ -11,14 +11,19 @@ logger = logging.getLogger(__name__)
 class AutoTyper:
     """Handles automatic typing of transcribed text at cursor position."""
     
-    def __init__(self):
-        """Initialize the auto typer."""
+    def __init__(self, hotkey_manager=None):
+        """Initialize the auto typer.
+        
+        Args:
+            hotkey_manager: Optional HotkeyManager instance to coordinate with
+        """
         self.keyboard = Controller()
         self.enabled = True
         self.typing_delay = 1.0  # Delay before typing (seconds)
         self.typing_speed = 0.02  # Delay between characters (seconds)
         self.excluded_apps = ['Keychain Access', 'Login Window', '1Password']
         self.typing_thread: Optional[threading.Thread] = None
+        self.hotkey_manager = hotkey_manager
         
     def set_enabled(self, enabled: bool) -> None:
         """Enable or disable auto-typing.
@@ -144,6 +149,11 @@ class AutoTyper:
                         callback(False, "Typing blocked in current application")
                     return
                 
+                # Suspend hotkeys before typing to prevent feedback loops
+                if self.hotkey_manager:
+                    self.hotkey_manager.suspend_hotkeys()
+                    logger.debug("Suspended hotkeys for auto-typing")
+                
                 # Clean and prepare text
                 clean_text = self._prepare_text(text)
                 logger.info(f"Auto-typing: '{clean_text[:50]}{'...' if len(clean_text) > 50 else ''}'")
@@ -159,6 +169,11 @@ class AutoTyper:
                 logger.error(f"Error during auto-typing: {e}")
                 if callback:
                     callback(False, f"Typing error: {e}")
+            finally:
+                # Always resume hotkeys, even if there was an error
+                if self.hotkey_manager:
+                    self.hotkey_manager.resume_hotkeys()
+                    logger.debug("Resumed hotkeys after auto-typing")
         
         self.typing_thread = threading.Thread(target=typing_worker, daemon=True)
         self.typing_thread.start()

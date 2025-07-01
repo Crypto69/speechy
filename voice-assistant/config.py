@@ -30,7 +30,9 @@ class Config:
         "auto_typing_mode": "raw",  # "raw", "corrected", or "both"
         "auto_typing_excluded_apps": ["Keychain Access", "Login Window", "1Password"],
         "confidence_threshold": -0.5,  # Minimum confidence for accepting transcriptions
-        "silence_skip_threshold": 50  # Skip Whisper processing if max amplitude below this value
+        "silence_skip_threshold": 50,  # Skip Whisper processing if max amplitude below this value
+        "start_at_login": False,  # Start application at system login
+        "start_minimized": True  # Start minimized to system tray when launched at login
     }
     
     def __init__(self, config_file: str = "config.json"):
@@ -177,3 +179,15 @@ class Config:
     def get_confidence_threshold(self) -> float:
         """Get confidence threshold for accepting transcriptions."""
         return self.config.get("confidence_threshold", -0.5)
+    
+    def get_silence_skip_threshold(self) -> int:
+        """Get silence skip threshold for audio processing."""
+        return self.config.get("silence_skip_threshold", 50)
+    
+    def should_start_at_login(self) -> bool:
+        """Check if application should start at login."""
+        return self.config.get("start_at_login", False)
+    
+    def should_start_minimized(self) -> bool:
+        """Check if application should start minimized."""
+        return self.config.get("start_minimized", True)

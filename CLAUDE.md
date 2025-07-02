@@ -83,13 +83,14 @@ log show --predicate 'subsystem == "com.apple.TCC"' --last 5m
 
 ### Core Application Flow
 1. **main.py** → **application_manager.py** - Entry point and lifecycle management
-2. **voice_assistant.py** - Central coordinator orchestrating all components
-3. **hotkey_manager.py** - Global hotkey detection (F9) using pynput
-4. **audio_handler.py** - Microphone capture with PyAudio
-5. **transcriber.py** - Local Whisper processing with faster-whisper
-6. **llm_client.py** - Ollama API integration for text enhancement
-7. **auto_typer.py** - Automatic typing at cursor position
-8. **gui.py** - PyQt5 interface with system tray integration
+2. **application_manager.py** - Initializes components and manages startup behavior (show/hide main window)
+3. **voice_assistant.py** - Central coordinator orchestrating all components
+4. **hotkey_manager.py** - Global hotkey detection (F9) using pynput
+5. **audio_handler.py** - Microphone capture with PyAudio
+6. **transcriber.py** - Local Whisper processing with faster-whisper
+7. **llm_client.py** - Ollama API integration for text enhancement
+8. **auto_typer.py** - Automatic typing at cursor position
+9. **gui.py** - PyQt5 interface with system tray integration
 
 ### Threading Architecture
 - **Main Thread**: PyQt5 GUI event loop and system tray
@@ -112,6 +113,7 @@ log show --predicate 'subsystem == "com.apple.TCC"' --last 5m
 - Single instance enforcement using socket binding
 - Logging configuration and directory management
 - Permission checking and comprehensive environment reporting
+- Startup behavior management with configurable window visibility
 
 **HotkeyManager (hotkey_manager.py)**
 - Global hotkey detection supporting F-keys and modifier combinations
@@ -222,9 +224,17 @@ log show --predicate 'subsystem == "com.apple.TCC"' --last 5m
     "audio_device_index": null,
     "auto_typing_enabled": false,
     "auto_typing_mode": "raw",
-    "auto_typing_excluded_apps": ["Keychain Access", "1Password"]
+    "auto_typing_excluded_apps": ["Keychain Access", "1Password"],
+    "start_minimized": true
 }
 ```
+
+**Startup Behavior:**
+- **start_minimized**: Controls whether the application starts with the main window visible or minimized to system tray
+- Default: `true` - Application starts minimized with only system tray icon visible
+- Set to `false` to show main window on startup
+- System tray remains functional regardless of setting
+- Users can access the application through system tray icon when minimized
 
 **Model Selection Guidelines:**
 - **Whisper**: tiny (fastest) → base (recommended) → small → medium → large (most accurate)

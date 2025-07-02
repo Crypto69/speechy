@@ -114,7 +114,11 @@ class ApplicationManager:
                 # Set permissions tab as active
                 self.voice_assistant.gui.tab_widget.setCurrentIndex(1)  # Permissions is the second tab
             
-            self.voice_assistant.gui.show()
+            # Check if application should start minimized
+            if not self.voice_assistant.config.should_start_minimized():
+                self.voice_assistant.gui.show()
+            else:
+                logger.info("Starting minimized - window hidden, system tray active")
         
         # Start assistant
         self.voice_assistant.start()

@@ -1,5 +1,5 @@
 {
-    "hotkey": "f9",
+    "hotkey": "alt+space",
     "whisper_model": "small.en",
     "ollama_model": "llama3.2:3b",
     "ollama_host": "localhost",
@@ -24,5 +24,6 @@
     "confidence_threshold": -0.5,
     "silence_skip_threshold": 50,
     "start_at_login": false,
-    "start_minimized": true
+    "start_minimized": true,
+    "prompt_style": "minimal"
 }

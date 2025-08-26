@@ -231,7 +231,7 @@ python main.py
 
 ### Hotkey Options
 
-- `f9`, `f10`, `f11`, `f12`: Function keys
+- `f5`, `f6`, `f9`, `f10`, `f11`, `f12`: Function keys
 - `ctrl+space`: Control + Space
 - `alt+space`: Alt + Space
 

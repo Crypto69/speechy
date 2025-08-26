@@ -32,7 +32,8 @@ class Config:
         "confidence_threshold": -0.5,  # Minimum confidence for accepting transcriptions
         "silence_skip_threshold": 50,  # Skip Whisper processing if max amplitude below this value
         "start_at_login": False,  # Start application at system login
-        "start_minimized": True  # Start minimized to system tray when launched at login
+        "start_minimized": True,  # Start minimized to system tray when launched at login
+        "prompt_style": "transcription"  # Prompt style for LLM corrections: transcription, minimal, formal, code
     }
     
     def __init__(self, config_file: str = "config.json"):
@@ -191,3 +192,11 @@ class Config:
     def should_start_minimized(self) -> bool:
         """Check if application should start minimized."""
         return self.config.get("start_minimized", True)
+    
+    def get_prompt_style(self) -> str:
+        """Get prompt style for LLM corrections."""
+        return self.config.get("prompt_style", "transcription")
+    
+    def set_prompt_style(self, style: str) -> None:
+        """Set prompt style for LLM corrections."""
+        self.set("prompt_style", style)

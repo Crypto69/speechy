@@ -131,3 +131,7 @@ logs/
 *.mp3
 *.m4a
 temp_audio.*
+
+# Build artifacts and distribution files
+*.dmg
+*.app

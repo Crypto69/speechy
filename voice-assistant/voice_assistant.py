@@ -335,6 +335,12 @@ class VoiceAssistant(QObject):
             if self.notification_manager:
                 self.notification_manager.set_enabled(new_settings.get('notification_enabled', True))
             
+            # Update prompt style
+            if new_settings.get('prompt_style') != self.config.get_prompt_style():
+                if self.audio_processor:
+                    self.audio_processor.update_prompt_style(new_settings.get('prompt_style', 'transcription'))
+                    logger.info(f"Prompt style updated to: {new_settings.get('prompt_style')}")
+            
             logger.info("Settings updated successfully")
             
         except Exception as e:

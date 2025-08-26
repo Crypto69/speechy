@@ -198,7 +198,7 @@ The application follows an event-driven architecture with these key components:
 - Device selection: null for default, or specific device index from audio device enumeration
 
 **Hotkey Configuration:**
-- Supports F-keys (f9, f10, f11, f12) and modifier combinations (ctrl+space, alt+space)
+- Supports F-keys (f5, f6, f9, f10, f11, f12) and modifier combinations (ctrl+space, alt+space)
 - Parsed in `HotkeyManager.parse_hotkey()` method
 
 **Auto-Typing Configuration:**

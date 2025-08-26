@@ -30,7 +30,7 @@ class AudioProcessor(QObject):
         self.llm_client = llm_client
         self.auto_typer = auto_typer
         self.notification_manager = notification_manager
-        self.prompt_manager = PromptManager()
+        self.prompt_manager = PromptManager(strategy=self.config.get_prompt_style())
         
         # Callbacks
         self.log_transcription_callback: Optional[Callable] = None
@@ -49,6 +49,11 @@ class AudioProcessor(QObject):
     def set_log_transcription_callback(self, callback: Callable):
         """Set callback for logging transcriptions."""
         self.log_transcription_callback = callback
+    
+    def update_prompt_style(self, style: str):
+        """Update the prompt style for LLM corrections."""
+        self.prompt_manager.set_strategy(style)
+        logger.info(f"Prompt style updated to: {style}")
     
     def process_audio_async(self, audio_file_path: str):
         """Process audio file asynchronously through the complete pipeline."""

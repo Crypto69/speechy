@@ -117,7 +117,7 @@ log show --predicate 'subsystem == "com.apple.TCC"' --last 5m
 
 **HotkeyManager (hotkey_manager.py)**
 - Global hotkey detection supporting F-keys and modifier combinations
-- Configurable hotkey parsing: f9, f10, f11, f12, ctrl+space, alt+space, option+space
+- Configurable hotkey parsing: f5, f6, f9, f10, f11, f12, ctrl+space, alt+space, option+space
 - macOS-specific pynput integration with Option key support
 
 **AudioHandler (audio_handler.py)**

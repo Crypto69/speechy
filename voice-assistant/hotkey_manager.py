@@ -33,7 +33,7 @@ class HotkeyManager(QObject):
         """Parse hotkey string into key combination."""
         logger.info(f"Parsing hotkey string: '{self.hotkey_string}'")
         
-        if self.hotkey_string.lower() in ['f9', 'f10', 'f11', 'f12']:
+        if self.hotkey_string.lower() in ['f5', 'f6', 'f9', 'f10', 'f11', 'f12']:
             self.hotkey_combo = {getattr(keyboard.Key, self.hotkey_string.lower())}
             logger.info(f"Set hotkey combo to F-key: {self.hotkey_combo}")
         elif self.hotkey_string.lower() == 'ctrl+space':

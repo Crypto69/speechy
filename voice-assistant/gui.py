@@ -542,7 +542,7 @@ class VoiceAssistantGUI(QMainWindow):
         hotkey_layout = QHBoxLayout()
         hotkey_layout.addWidget(QLabel("Hotkey:"))
         self.hotkey_combo = QComboBox()
-        self.hotkey_combo.addItems(['f9', 'f10', 'f11', 'f12', 'ctrl+space', 'alt+space', 'option+space'])
+        self.hotkey_combo.addItems(['f5', 'f6', 'f9', 'f10', 'f11', 'f12', 'ctrl+space', 'alt+space', 'option+space'])
         self.hotkey_combo.setMinimumWidth(150)
         self.hotkey_combo.setCurrentText(self.config.get_hotkey())
         hotkey_layout.addWidget(self.hotkey_combo)
@@ -605,6 +605,31 @@ class VoiceAssistantGUI(QMainWindow):
         
         ollama_layout.addStretch()
         model_layout.addLayout(ollama_layout)
+        
+        # Prompt style selector
+        prompt_layout = QHBoxLayout()
+        prompt_layout.addWidget(QLabel("Prompt Style:"))
+        self.prompt_style_combo = QComboBox()
+        self.prompt_style_combo.setMinimumWidth(200)
+        
+        # Import PromptManager to get display names
+        from prompts import PromptManager
+        prompt_display_names = PromptManager.get_display_names()
+        
+        # Add prompt styles with user-friendly names
+        for key, display_name in prompt_display_names.items():
+            self.prompt_style_combo.addItem(display_name, key)
+        
+        # Set current prompt style
+        current_style = self.config.get_prompt_style()
+        index = self.prompt_style_combo.findData(current_style)
+        if index >= 0:
+            self.prompt_style_combo.setCurrentIndex(index)
+        
+        self.prompt_style_combo.setToolTip("Choose how transcriptions are corrected by AI")
+        prompt_layout.addWidget(self.prompt_style_combo)
+        prompt_layout.addStretch()
+        model_layout.addLayout(prompt_layout)
         
         # Initialize models list (will be populated after GUI is ready)
         self._populate_ollama_models_async()
@@ -1168,6 +1193,7 @@ class VoiceAssistantGUI(QMainWindow):
         self.config.set("confidence_threshold", self.confidence_spinbox.value())
         self.config.set("whisper_model", self.whisper_combo.currentText())
         self.config.set("ollama_model", self.ollama_combo.currentText())
+        self.config.set("prompt_style", self.prompt_style_combo.currentData())
         self.config.set("log_transcriptions", self.log_transcriptions_cb.isChecked())
         self.config.set("notification_enabled", self.notifications_cb.isChecked())
         self.config.set("copy_to_clipboard", self.clipboard_cb.isChecked())

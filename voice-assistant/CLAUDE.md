@@ -155,9 +155,10 @@ The application follows an event-driven architecture with these key components:
 1. `HotkeyManager` (in main.py) detects global hotkey presses
 2. `AudioHandler` captures microphone input to temporary WAV files
 3. `WhisperTranscriber` processes audio files locally using faster-whisper
-4. `OllamaClient` sends transcriptions to local Ollama server for AI responses
-5. `AutoTyper` types corrected text directly at cursor position (optional)
-6. `VoiceAssistantGUI` displays results and provides configuration interface
+4. `PromptManager` selects appropriate correction style based on user settings
+5. `OllamaClient` sends transcriptions to local Ollama server with style-specific prompts
+6. `AutoTyper` types corrected text directly at cursor position (optional)
+7. `VoiceAssistantGUI` displays results and provides configuration interface
 
 **Key Classes and Responsibilities:**
 
@@ -165,6 +166,7 @@ The application follows an event-driven architecture with these key components:
 - **`HotkeyManager`** (main.py): Global hotkey detection using pynput, supports F-keys and modifier combinations
 - **`AudioHandler`** (audio_handler.py): Real-time audio capture with PyAudio, includes level monitoring and temporary file management
 - **`WhisperTranscriber`** (transcriber.py): Local Whisper model loading and transcription with device optimization (CPU/GPU)
+- **`PromptManager`** (prompts.py): AI prompt management with four correction styles and user-friendly display names
 - **`OllamaClient`** (llm_client.py): HTTP client for Ollama API with model management and error handling
 - **`AutoTyper`** (auto_typer.py): Automatic typing at cursor position with app exclusions and customizable delays
 - **`VoiceAssistantGUI`** (gui.py): PyQt5 interface with system tray, tabbed interface, visual recording indicators, and custom about dialog
@@ -180,6 +182,16 @@ The application follows an event-driven architecture with these key components:
 - `config.json` stores all settings with defaults in `Config.DEFAULT_CONFIG`
 - Runtime configuration changes via GUI settings tab
 - Settings automatically saved and propagated to components
+- **Prompt Style Selection**: Four AI correction styles available in Settings > Model Settings
+
+**AI Prompt System:**
+- **PromptManager** class handles different correction styles with user-friendly names
+- **Transcription (Default)**: Comprehensive correction with punctuation commands, grammar cleanup
+- **Minimal Correction**: Preserve casual tone, fix only critical errors  
+- **Formal Writing**: Convert to professional business writing style
+- **Code Context**: Programming-aware corrections with syntax understanding
+- Real-time prompt switching without application restart
+- Located in `prompts.py` with display names for GUI integration
 
 **State Management:**
 - Recording state managed in `VoiceAssistant` class
@@ -213,6 +225,12 @@ The application follows an event-driven architecture with these key components:
 - Extend `transcriber.py` for new speech-to-text services
 - Extend `llm_client.py` for different LLM APIs
 - Update `Config.DEFAULT_CONFIG` for new model options
+
+**Adding New Prompt Styles:**
+- Add new prompts to `PromptManager` class constants in `prompts.py`
+- Update `_prompts` dictionary and `get_display_names()` with user-friendly names
+- Prompt styles automatically appear in Settings > Model Settings dropdown
+- Follow existing prompt format: clear rules, specific examples, "Output only" instruction
 
 **GUI Extensions:**
 - Add new tabs in `VoiceAssistantGUI.create_*_tab()` methods
